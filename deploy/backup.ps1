@@ -1,4 +1,4 @@
-# 水路运输检查平台 · 定时备份脚本（Windows 计划任务用）
+﻿# 水路运输检查平台 · 定时备份脚本（Windows 计划任务用）
 # 用法：
 #   手动执行：powershell -ExecutionPolicy Bypass -File deploy\backup.ps1
 #   定时执行：schtasks /create /tn "SLYS每日备份" /tr "powershell -ExecutionPolicy Bypass -File <平台目录>\deploy\backup.ps1" /sc daily /st 20:00
