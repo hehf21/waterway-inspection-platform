@@ -47,6 +47,7 @@ docker compose up -d          # http://localhost:8098，数据持久化在 ./dat
 |---|---|---|
 | `SLYS_HOST` / `SLYS_PORT` | 监听地址（外网部署设 `0.0.0.0`） | 127.0.0.1:8098 |
 | `SLYS_SECRET` | 固定会话密钥（≥32位）；不设则首次启动生成 `data\secret.key` | 自动生成 |
+| `SLYS_DATA` | 数据目录覆盖（多环境/测试隔离用） | `平台目录\data` |
 | `SLYS_WEBHOOK_URL` | 企业微信群机器人地址（逾期提醒每日推送） | 空=不推送 |
 | `SLYS_PUSH_TIME` | 每日推送时间 | 08:30 |
 | `SLYS_PUBLIC_NOTICE` | 双随机结果公示页开关 | 1 |
