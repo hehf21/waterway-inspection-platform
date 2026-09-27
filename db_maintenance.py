@@ -80,11 +80,11 @@ def do_check():
 
     print("\n【审计日志哈希链】")
     import hashlib
-    rows = c.execute("SELECT * FROM audit_logs ORDER BY id").fetchall()
+    rows = [dict(x) for x in c.execute("SELECT * FROM audit_logs ORDER BY id")]
     prev_hash = ""
     legacy = breaks = 0
     for r in rows:
-        if not r["chain_hash"]:
+        if not r.get("chain_hash"):
             legacy += 1
             prev_hash = ""
             continue
