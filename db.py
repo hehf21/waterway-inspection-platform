@@ -284,11 +284,18 @@ def get_db() -> sqlite3.Connection:
 
 
 def audit(conn, username, action, entity="", entity_id="", detail="", before="", after="", ip=""):
+    """写操作日志并生成防篡改哈希链：本条 hash = sha256(上一条 hash + 本条内容)，
+    校验时按 id 顺序重算即可发现任何删改（司法级留痕）。"""
+    import hashlib
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    prev = conn.execute("SELECT chain_hash FROM audit_logs ORDER BY id DESC LIMIT 1").fetchone()
+    prev_hash = (prev["chain_hash"] or "") if prev else ""
+    payload = "|".join([username, action, entity, str(entity_id), detail, before, after, ip, ts])
+    chain = hashlib.sha256((prev_hash + "|" + payload).encode("utf-8")).hexdigest()
     conn.execute(
-        "INSERT INTO audit_logs(username,action,entity,entity_id,detail,before,after,ip,created_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?)",
-        (username, action, entity, str(entity_id), detail, before, after, ip,
-         datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        "INSERT INTO audit_logs(username,action,entity,entity_id,detail,before,after,ip,created_at,chain_hash)"
+        " VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (username, action, entity, str(entity_id), detail, before, after, ip, ts, chain))
 
 
 def init_db():
@@ -305,6 +312,7 @@ def init_db():
         ("inspections", "parent_id", "INTEGER DEFAULT 0"),
         ("inspections", "plan_item_id", "INTEGER DEFAULT 0"),
         ("archive_logs", "file_path", "TEXT DEFAULT ''"),
+        ("audit_logs", "chain_hash", "TEXT DEFAULT ''"),
     ]:
         cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
         if col not in cols:

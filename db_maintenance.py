@@ -78,6 +78,24 @@ def do_check():
         print("  %-22s %s" % (name, ("OK" if n == 0 else "** %s 条" % n)))
     print("  小计孤儿/悬空：%s 条" % bad)
 
+    print("\n【审计日志哈希链】")
+    import hashlib
+    rows = c.execute("SELECT * FROM audit_logs ORDER BY id").fetchall()
+    prev_hash = ""
+    legacy = breaks = 0
+    for r in rows:
+        if not r["chain_hash"]:
+            legacy += 1
+            prev_hash = ""
+            continue
+        payload = "|".join([r["username"], r["action"], r["entity"], str(r["entity_id"]),
+                            r["detail"], r["before"], r["after"], r["ip"], r["created_at"]])
+        if hashlib.sha256((prev_hash + "|" + payload).encode("utf-8")).hexdigest() != r["chain_hash"]:
+            breaks += 1
+        prev_hash = r["chain_hash"] or ""
+    print(f"  已入链 {len(rows) - legacy} 条；未入链（历史留痕）{legacy} 条；链断点 {breaks} 条"
+          + ("（有删改或并发写入异常，需人工核对）" if breaks else ""))
+
     print("\n【数据质量】")
     dup = q1(c, "SELECT COUNT(*) FROM enterprises a WHERE EXISTS("
                 " SELECT 1 FROM enterprises b WHERE b.id<a.id AND (b.name=a.name OR (a.credit_code<>'' AND b.credit_code=a.credit_code)))")

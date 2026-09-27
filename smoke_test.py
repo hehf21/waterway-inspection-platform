@@ -728,6 +728,25 @@ check("企业用户越界导入被拒（只能填本企业）",
       r.status_code == 302 and "新增0条" in unquote(r.headers.get("location", "")),
       unquote(r.headers.get("location", "")))
 
+# ========== 26. 审计日志哈希链（防篡改留痕） ==========
+import hashlib as _hl
+conn = get_db()
+_rows = conn.execute("SELECT * FROM audit_logs ORDER BY id").fetchall()
+conn.close()
+_prev = ""
+_brk = 0
+for _r in _rows:
+    if not _r["chain_hash"]:
+        _prev = ""
+        continue
+    _pl = "|".join([_r["username"], _r["action"], _r["entity"], str(_r["entity_id"]),
+                    _r["detail"], _r["before"], _r["after"], _r["ip"], _r["created_at"]])
+    if _hl.sha256((_prev + "|" + _pl).encode("utf-8")).hexdigest() != _r["chain_hash"]:
+        _brk += 1
+    _prev = _r["chain_hash"] or ""
+check("审计日志哈希链完整（全部入链无断点）",
+      _brk == 0 and all(_r["chain_hash"] for _r in _rows), f"{len(_rows)}条 断点{_brk}")
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

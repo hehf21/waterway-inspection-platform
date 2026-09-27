@@ -81,6 +81,44 @@ for _r in (routes_auth.router, routes_dash.router, routes_enterprise.router, rou
     app.include_router(_r)
 
 
+def _setup_file_log():
+    """运行日志落盘 data\\logs\\app.log（超 5MB 轮转一代）：stdout/stderr 同时写控制台与文件，
+    双击启动日志不丢。仅 python app.py 直启时启用，测试/CI 导入模块不受影响。"""
+    import sys
+    log_dir = os.path.join(BASE, "data", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    path = os.path.join(log_dir, "app.log")
+    try:
+        if os.path.exists(path) and os.path.getsize(path) > 5 * 1024 * 1024:
+            os.replace(path, path + ".1")
+    except OSError:
+        pass
+    fp = open(path, "a", encoding="utf-8", buffering=1)
+
+    class _Tee:
+        def __init__(self, *streams):
+            self.streams = streams
+
+        def write(self, s):
+            for st in self.streams:
+                try:
+                    st.write(s)
+                except Exception:
+                    pass
+
+        def flush(self):
+            for st in self.streams:
+                try:
+                    st.flush()
+                except Exception:
+                    pass
+
+    sys.stdout = _Tee(sys.__stdout__, fp)
+    sys.stderr = _Tee(sys.__stderr__, fp)
+
+
 if __name__ == "__main__":
+    _setup_file_log()
     import uvicorn
+    print(f"[启动] {APP_NAME} http://{HOST}:{PORT}  运行日志：data\\logs\\app.log")
     uvicorn.run(app, host=HOST, port=PORT)
