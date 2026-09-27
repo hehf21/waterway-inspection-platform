@@ -158,9 +158,31 @@ def require(request: Request, roles=None):
     return user, None
 
 
+def msg_count(conn, user) -> int:
+    """待办提醒总数（逾期+待复核+未签字）——导航红点用，轻量单查询"""
+    if not user:
+        return 0
+    today = date.today().isoformat()
+    scope = " AND i.enterprise_id=?" if user["role"] == "enterprise" else ""
+    args = [user["enterprise_id"]] if user["role"] == "enterprise" else []
+    return conn.execute(
+        "SELECT (SELECT COUNT(*) FROM problems p JOIN inspections i ON i.id=p.inspection_id"
+        "  WHERE p.status IN ('pending','returned') AND p.deadline<>'' AND p.deadline<?" + scope + ")"
+        " + (SELECT COUNT(*) FROM problems p JOIN inspections i ON i.id=p.inspection_id"
+        "     WHERE p.status='submitted'" + scope + ")"
+        " + (SELECT COUNT(*) FROM inspections i WHERE i.status IN ('closed','archived')"
+        "     AND (NOT EXISTS(SELECT 1 FROM signatures s WHERE s.inspection_id=i.id AND s.sign_type='ent')"
+        "      OR NOT EXISTS(SELECT 1 FROM signatures s WHERE s.inspection_id=i.id AND s.sign_type='insp'))" + scope + ")",
+        [today] + args * 3).fetchone()[0]
+
+
 def render(request: Request, name: str, ctx: dict, user=None):
     ctx.update({"request": request, "user": user, "APP_NAME": APP_NAME,
                 "REC_STATUS_CN": REC_STATUS_CN, "PROB_STATUS_CN": PROB_STATUS_CN,
                 "ROLES": ROLES, "msg": request.query_params.get("msg", ""),
                 "csrf": csrf_token(user["id"]) if user else ""})
+    if user and "msg_count" not in ctx:
+        conn = get_db()
+        ctx["msg_count"] = msg_count(conn, user)
+        conn.close()
     return templates.TemplateResponse(request, name, ctx)

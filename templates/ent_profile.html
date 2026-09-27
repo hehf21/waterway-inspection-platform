@@ -69,6 +69,15 @@
   </table>
 
   {% if user.role in ('enterprise','gov_admin','sysadmin') %}
+  <p class="form-inline">
+    <a class="btn btn-sm btn-gray" href="/ships/template">⇪ 下载船舶导入模板（.xlsx）</a>
+  </p>
+  <form method="post" action="/ships/import" enctype="multipart/form-data" class="form-inline">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button class="btn-sm btn-green">批量导入船舶</button>
+    <span class="muted">按“企业+船名”去重；企业用户只能填本企业（或留空）</span>
+  </form>
   <details {% if not ships %}open{% endif %}>
     <summary style="cursor:pointer;color:var(--primary)">＋ 新增/编辑船舶（审计 P2-9）</summary>
     <form method="post" action="/enterprises/{{ ent.id }}/ships/save">

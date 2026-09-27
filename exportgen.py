@@ -82,3 +82,26 @@ def ent_template_xlsx():
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def ships_template_xlsx():
+    """船舶清单批量导入模板"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "船舶清单"
+    cols = ["所属企业名称", "船名", "登记号/IMO", "船型/种类", "载重吨", "总吨", "建成日期",
+            "营业运输证号", "证书情况", "备注"]
+    ws.append(cols)
+    for w, col in zip([32, 16, 18, 16, 10, 10, 12, 18, 22, 20], "ABCDEFGHIJ"):
+        ws.column_dimensions[col].width = w
+    ws.append(["平潭XX航运有限公司", "XX号", "CN123456789", "普通货船", "5000", "3000", "2018-06",
+               "闽船001", "登记/检验证书齐全有效", "示例行，导入时删除"])
+    ws2 = wb.create_sheet("填写说明")
+    for line in ["1. 第1行为表头，请勿修改列名；从第2行开始填写。",
+                 "2. 所属企业名称、船名为必填；同一企业下同名船舶的行自动跳过（按“企业+船名”去重）。",
+                 "3. 所属企业名称须与企业名录中的名称一致；企业用户自助导入时只能填本企业（或留空）。",
+                 "4. 支持 .xlsx 格式，单次最多导入500条。"]:
+        ws2.append([line])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

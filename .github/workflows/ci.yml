@@ -24,9 +24,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Python 语法编译
-        run: python -m py_compile app.py webcore.py routes_*.py db.py config.py pdfgen.py zipgen.py exportgen.py seed_items.py smoke_test.py js_syntax_check.py check_docs.py db_maintenance.py
+        run: python -m py_compile app.py webcore.py routes_*.py db.py config.py pdfgen.py zipgen.py exportgen.py seed_items.py smoke_test.py js_syntax_check.py check_docs.py db_maintenance.py e2e_test.py
 
-      - name: 168 项全流程回归
+      - name: 173 项全流程回归
         run: python smoke_test.py
 
       - name: 内联 JS 语法检查
@@ -41,3 +41,27 @@ jobs:
           BAD=$(git ls-files | grep -E '(^|/)(data|backups)/|secret|\.db$|\.db-(wal|shm)$' || true)
           if [ -n "$BAD" ]; then echo "疑似敏感文件入库："; echo "$BAD"; exit 1; fi
           echo "OK"
+
+      - name: 依赖漏洞扫描（提示性，不阻断）
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装依赖与浏览器
+        run: |
+          pip install -r requirements.txt playwright
+          playwright install --with-deps chromium
+
+      - name: 浏览器级 E2E（20 项闭环冒烟）
+        run: python e2e_test.py

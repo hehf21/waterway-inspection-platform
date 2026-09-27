@@ -689,6 +689,45 @@ check("检查编号撞号自动跳号（抗并发）", r.status_code == 302 and 
       f"占号={taken} 新记录={new_code}")
 check("全库检查编号唯一", uniq["c"] == uniq["d"], f"{uniq['c']} 条 / {uniq['d']} 个编号")
 
+# ========== 25. 船舶批量导入 + 消息红点 ==========
+t = csrf_of()
+check("船舶导入模板可下载", c.get("/ships/template").content[:2] == b"PK")
+_wb = Workbook()
+_ws = _wb.active
+_ws.append(["所属企业名称", "船名", "登记号/IMO", "船型/种类", "载重吨", "总吨", "建成日期",
+            "营业运输证号", "证书情况", "备注"])
+_ws.append(["平潭导入甲公司", "海星1", "CN001", "普通货船", "5000", "3000", "2018-06", "闽船A1", "齐全", ""])
+_ws.append(["平潭导入甲公司", "海星2", "CN002", "普通货船", "4000", "2000", "2019-01", "闽船A2", "齐全", ""])
+_ws.append(["平潭导入甲公司", "海星1", "CN003", "普通货船", "1", "1", "2020-01", "", "", "重名应跳过"])
+_ws.append(["不存在的企业", "幽灵船", "", "", "", "", "", "", "", "企业不存在应跳过"])
+_ib = io.BytesIO()
+_wb.save(_ib)
+_ib.seek(0)
+r = c.post("/ships/import", data={"csrf": t}, files={"file": ("船舶.xlsx", _ib, "application/vnd.ms-excel")},
+           follow_redirects=False)
+loc_msg = unquote(r.headers.get("location", ""))
+check("船舶批量导入（新增2跳过2）", r.status_code == 302 and "新增2条，跳过2条" in loc_msg, loc_msg)
+conn = get_db()
+n_ship = conn.execute("SELECT COUNT(*) c FROM ships WHERE name LIKE '海星%'").fetchone()["c"]
+conn.close()
+check("船舶已入库（同名去重生效）", n_ship == 2, f"海星系列 {n_ship} 条")
+check("消息提醒红点（有逾期事项时导航显示计数）", "<sup" in c.get("/").text)
+te = TestClient(app)
+te.post("/login", data={"username": "ent", "password": "ent2027!"}, follow_redirects=False)
+te_t = re.search(r'<meta name="csrf" content="([^"]+)"', te.get("/").text).group(1)
+_wb2 = Workbook()
+_ws2 = _wb2.active
+_ws2.append(["所属企业名称", "船名"])
+_ws2.append(["平潭导入乙公司", "越界船"])
+_ib2 = io.BytesIO()
+_wb2.save(_ib2)
+_ib2.seek(0)
+r = te.post("/ships/import", data={"csrf": te_t}, files={"file": ("x.xlsx", _ib2, "application/vnd.ms-excel")},
+            follow_redirects=False)
+check("企业用户越界导入被拒（只能填本企业）",
+      r.status_code == 302 and "新增0条" in unquote(r.headers.get("location", "")),
+      unquote(r.headers.get("location", "")))
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

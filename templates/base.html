@@ -25,7 +25,7 @@
     <a href="/overdue">整改督办</a>
     <a href="/enterprises/{{ user.enterprise_id }}/profile">企业信息与船舶</a>
     {% endif %}
-    <a href="/messages">🔔 消息提醒</a>
+    <a href="/messages">🔔 消息提醒{% if msg_count %} <sup style="color:#fff;background:#c0392b;border-radius:8px;padding:0 5px;font-size:11px">{{ msg_count }}</sup>{% endif %}</a>
     {% if user.role in ('gov_admin','gov_staff') %}<a href="/plans">检查计划</a><a href="/overdue">督办台账</a><a href="/stats">统计分析</a><a href="/random">双随机抽查</a>{% endif %}
     {% if user.role in ('gov_admin','sysadmin') %}<a href="/users">用户管理</a><a href="/audit">操作日志</a>{% endif %}
   </nav>

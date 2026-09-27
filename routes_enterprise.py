@@ -121,6 +121,103 @@ async def ent_self(request: Request, csrf: str = Form(""), contact: str = Form("
     return RedirectResponse(f"/enterprises/{eid}/profile?msg=企业联系信息已更新", status_code=302)
 
 
+@router.get("/ships/template")
+def ships_template(request: Request):
+    user, err = require(request, ("enterprise", "gov_admin", "sysadmin"))
+    if err: return err
+    import exportgen
+    return Response(exportgen.ships_template_xlsx(),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=dl_header("船舶清单批量导入模板.xlsx"))
+
+
+@router.post("/ships/import")
+async def ships_import(request: Request, csrf: str = Form(""), file: UploadFile = File(...)):
+    """船舶清单批量导入：按“企业+船名”去重；企业用户只能导入本企业（企业列留空或等于本企业名称）。"""
+    user, err = require(request, ("enterprise", "gov_admin", "sysadmin"))
+    if err: return err
+    if bad_csrf(user, csrf):
+        return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
+    from openpyxl import load_workbook
+    max_import = 10 * 1024 * 1024
+    raw = file.file.read(max_import + 1)
+    if len(raw) > max_import:
+        return HTMLResponse("导入文件超过 10MB 上限，请拆分后分批导入", status_code=400)
+    try:
+        wb = load_workbook(io.BytesIO(raw), read_only=True)
+    except Exception:
+        return HTMLResponse("文件无法解析，请使用 .xlsx 模板", status_code=400)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return RedirectResponse("/messages?msg=表格为空", status_code=302)
+    if len(rows) - 1 > 500:
+        return HTMLResponse("单次最多导入 500 条（当前 %d 行），请拆分后分批导入" % (len(rows) - 1), status_code=400)
+    head = [str(h or "").strip() for h in rows[0]]
+    alias = {"所属企业名称": ["所属企业名称", "企业名称", "所属企业"],
+             "船名": ["船名", "船舶名称"], "ship_no": ["登记号/IMO", "登记号", "IMO"],
+             "ship_type": ["船型/种类", "船型", "种类"], "dwt": ["载重吨", "参考载重量"],
+             "gt": ["总吨"], "built_date": ["建成日期", "建造日期"],
+             "license_no": ["营业运输证号", "营运证号"], "cert_status": ["证书情况"],
+             "remark": ["备注"]}
+    idx = {}
+    for field, names in alias.items():
+        for i, h in enumerate(head):
+            if h in names:
+                idx[field] = i
+                break
+    if "船名" not in idx:
+        return HTMLResponse("表头缺少“船名”列，请使用导入模板", status_code=400)
+
+    def cell(row, field):
+        i = idx.get(field)
+        return str(row[i]).strip() if i is not None and i < len(row) and row[i] is not None else ""
+
+    conn = get_db()
+    ent_map = {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM enterprises")}
+    added = skipped = 0
+    reasons = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for row in rows[1:]:
+        name = cell(row, "船名")
+        if not name:
+            skipped += 1
+            continue
+        ent_name = cell(row, "所属企业名称")
+        if user["role"] == "enterprise":
+            own = conn.execute("SELECT name FROM enterprises WHERE id=?", (user["enterprise_id"],)).fetchone()
+            if ent_name and own and ent_name != own["name"]:
+                skipped += 1
+                reasons.append(f"{name}：企业列非本企业，已跳过")
+                continue
+            eid = user["enterprise_id"]
+        else:
+            eid = ent_map.get(ent_name)
+            if not eid:
+                skipped += 1
+                reasons.append(f"{name}：企业“{ent_name or '空'}”在名录中不存在")
+                continue
+        dup = conn.execute("SELECT 1 FROM ships WHERE enterprise_id=? AND name=?", (eid, name)).fetchone()
+        if dup:
+            skipped += 1
+            reasons.append(f"{name}：同企业下同名船舶已存在")
+            continue
+        conn.execute("INSERT INTO ships(enterprise_id,name,ship_no,ship_type,dwt,gt,built_date,license_no,"
+                     "cert_status,remark,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                     (eid, name, cell(row, "ship_no"), cell(row, "ship_type"), cell(row, "dwt"),
+                      cell(row, "gt"), cell(row, "built_date"), cell(row, "license_no"),
+                      cell(row, "cert_status"), cell(row, "remark"), now))
+        added += 1
+    audit(conn, user["username"], "批量导入船舶", "ship", "",
+          f"新增{added}条，跳过{skipped}条" + (f"；{('；'.join(reasons[:5]))}" if reasons else ""))
+    conn.commit(); conn.close()
+    msg = f"船舶导入完成：新增{added}条，跳过{skipped}条"
+    if reasons:
+        msg += "（" + "；".join(reasons[:3]) + ("…" if len(reasons) > 3 else "") + "）"
+    return RedirectResponse(f"/enterprises/{user['enterprise_id']}/profile?msg={msg}"
+                            if user["role"] == "enterprise" else f"/enterprises?msg={msg}", status_code=302)
+
+
 @router.post("/enterprises/{eid}/ships/save")
 async def ship_save(request: Request, eid: int, sid: int = Form(0), name: str = Form(...),
                     ship_no: str = Form(""), ship_type: str = Form(""), dwt: str = Form(""),
