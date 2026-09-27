@@ -192,7 +192,9 @@ function submitForm(){
     item_id: p.item_id, description: p.description, basis: p.basis,
     requirement: p.requirement, deadline: p.deadline || '', responsible: p.responsible || '', to_msa: p.to_msa
   })));
-  document.forms[0].submit();
+  const _f = document.getElementById('ins-form');
+  if (!_f.reportValidity()) return;   // 必填缺失时浏览器标红提示，而不是提交后见错误页
+  _f.submit();
 }
 
 /* ---- 事件委托（CSP 无 unsafe-inline，不使用内联处理器） ---- */

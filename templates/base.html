@@ -57,7 +57,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.submit !== undefined) {
-    const f = e.target.closest('form'); if (f) f.submit();
+    const f = e.target.closest('form'); if (f && f.reportValidity()) f.submit();
   }
 });
 </script>

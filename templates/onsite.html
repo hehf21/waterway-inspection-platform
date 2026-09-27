@@ -230,7 +230,9 @@ function saveDraft(){
     item_id: p.item_id, description: p.description, basis: p.basis,
     requirement: p.requirement, deadline: p.deadline || '', responsible: p.responsible || '', to_msa: p.to_msa
   })));
-  document.getElementById('onsite-form').submit();
+  const _f = document.getElementById('onsite-form');
+  if (!_f.reportValidity()) return;   // 必填缺失时浏览器标红提示
+  _f.submit();
 }
 
 /* ---- 中断保护：现场登记进度自动保存（含基本信息），防误退出/断网丢失 ---- */

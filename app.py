@@ -9,6 +9,7 @@ import os
 import secrets
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
@@ -61,6 +62,22 @@ def healthz():
         return {"status": "ok"}
     except Exception:
         return Response('{"status":"error"}', status_code=500, media_type="application/json")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    """表单校验错误不要把 FastAPI 裸 JSON 甩给用户（使用体验问题）——渲染友好错误页"""
+    msgs = []
+    for e in exc.errors()[:5]:
+        loc = ".".join(str(x) for x in e.get("loc", []) if x != "body")
+        msgs.append(f"{loc or '表单'}：{e.get('msg', '')}")
+    try:
+        return templates.TemplateResponse(
+            request, "error.html",
+            {"code": 422, "msg": "表单校验未通过（" + "；".join(msgs) + "）。请返回补全必填项后重试。"},
+            status_code=422)
+    except Exception:
+        return HTMLResponse("<h3>422 表单校验未通过</h3><p>" + "；".join(msgs) + "</p>", status_code=422)
 
 
 @app.exception_handler(Exception)

@@ -8,7 +8,7 @@
 powershell -ExecutionPolicy Bypass -File deploy\release.ps1 -Push -Message "说明"
 ```
 
-五道关全绿才允许推送：Python 语法 → **175 项回归** → 内联 JS 语法 → **文档口径门禁**（文档里的回归项数必须与实测一致）→ **敏感文件门禁**（`data/`、密钥、库文件不得入库）。CI 上会再跑一遍同样的门禁。
+五道关全绿才允许推送：Python 语法 → **176 项回归** → 内联 JS 语法 → **文档口径门禁**（文档里的回归项数必须与实测一致）→ **敏感文件门禁**（`data/`、密钥、库文件不得入库）。CI 上会再跑一遍同样的门禁。
 
 ## 开发环境
 
@@ -30,7 +30,7 @@ python app.py                          # http://127.0.0.1:8098
 
 | 命令 | 作用 |
 |---|---|
-| `python smoke_test.py` | 175 项全流程回归（隔离数据目录） |
+| `python smoke_test.py` | 176 项全流程回归（隔离数据目录） |
 | `python e2e_test.py` | Playwright 浏览器级闭环冒烟（自动起 :8099） |
 | `python js_syntax_check.py` | 模板内联脚本语法（需 node） |
 | `python check_docs.py` | 文档回归项数 == 实测断言数 |

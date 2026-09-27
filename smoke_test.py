@@ -756,6 +756,17 @@ check("会话Cookie安全属性（HttpOnly+SameSite；HTTPS/反代自动加Secur
       "HttpOnly" in _ck and "SameSite=lax" in _ck and "Secure" not in _ck and "Secure" in _ck2,
       f"http头={_ck[:80]} / https头={_ck2[:80]}")
 
+# ========== 28. 表单校验错误友好化（使用体验修复） ==========
+# 整个 check_date 字段不传 → 触发 FastAPI 校验器（此前甩裸 JSON，应渲染友好错误页）
+r = c.post("/inspections/save", data={"csrf": t, "ins_id": 0, "enterprise_id": 1, "template_id": 0,
+                                     "parent_id": 0, "plan_item_id": 0, "check_type": "日常检查",
+                                     "check_mode": "现场检查",
+                                     "inspectors": "李", "conclusion": "未发现问题",
+                                     "items_json": "[]", "problems_json": "[]"}, follow_redirects=True)
+check("缺必填项→友好校验页（不再裸JSON）",
+      r.status_code == 422 and "表单校验未通过" in r.text and '"detail"' not in r.text,
+      f"status={r.status_code}")
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径
