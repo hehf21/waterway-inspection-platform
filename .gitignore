@@ -1,0 +1,19 @@
+# 运行数据：数据库/附件/归档/密钥/备份 —— 绝不入库（含密码哈希与会话密钥）
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 测试临时目录（smoke_test / PoC 自建）
+data_smoke/
+data_diag*/
+poc_data/
+migrate_test/
+
+# 编辑器/系统
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

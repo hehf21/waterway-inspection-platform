@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>月度考核汇总表　{{ month }}</h2>
+<p class="form-inline">
+  <form class="form-inline" method="get">
+    <input type="month" name="month" value="{{ month }}">
+    <button>查询</button>
+  </form>
+  <a class="btn" href="/stats/monthly/export?month={{ month }}">导出 Excel</a>
+  <button type="button" class="btn btn-gray" data-print>🖨 打印</button>
+  <a class="btn btn-gray" href="/stats">返回统计分析</a>
+</p>
+
+<div class="card">
+  <h3>一、总体情况</h3>
+  <table>
+    <tr><th>检查次数</th><th>涉及企业</th><th>未发现问题</th><th>责发整改</th><th>移送线索</th>
+        <th>发现问题</th><th>已销号</th><th>整改完成率</th><th>其中逾期</th></tr>
+    <tr>
+      <td>{{ head.ins_cnt or 0 }}</td>
+      <td>{{ head.ent_cnt or 0 }}</td>
+      <td>{{ head.clean_cnt or 0 }}</td>
+      <td>{{ head.rect_cnt or 0 }}</td>
+      <td>{{ head.move_cnt or 0 }}</td>
+      <td>{{ prob.p_cnt or 0 }}</td>
+      <td>{{ prob.passed or 0 }}</td>
+      <td>{{ ('%.1f'|format((prob.passed or 0) / prob.p_cnt * 100)) ~ '%' if prob.p_cnt else '—' }}</td>
+      <td class="result-ng">{{ prob.overdue or 0 }}</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>二、按检查类型</h3>
+  <table>
+    <tr><th>检查类型</th><th>次数</th></tr>
+    {% for r in by_type %}<tr><td>{{ r.check_type }}</td><td>{{ r.c }}</td></tr>
+    {% else %}<tr><td colspan="2" class="muted">本月无检查记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>三、按问题类别（高频问题）</h3>
+  <table>
+    <tr><th>检查项类别</th><th>问题数</th></tr>
+    {% for r in by_cat %}<tr><td>{{ r.category }}</td><td>{{ r.c }}</td></tr>
+    {% else %}<tr><td colspan="2" class="muted">本月无问题记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>四、计划执行与双随机</h3>
+  <table>
+    <tr><th>本月计划核销（家次）</th><th>累计核销（家次）</th><th>全年计划家次</th><th>本月双随机抽取批次</th></tr>
+    <tr>
+      <td>{{ plan_done_m }}</td>
+      <td>{{ plan_done_all }}</td>
+      <td>{{ plan_total }}</td>
+      <td>{{ draws }}</td>
+    </tr>
+  </table>
+  <p class="muted">口径：核销=关联检查计划项且非草稿的检查记录数；双随机批次按抽取时间统计。</p>
+</div>
+{% endblock %}

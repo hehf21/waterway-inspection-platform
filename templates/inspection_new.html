@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ '编辑检查草稿 #' ~ ins.id if ins else '登记检查记录' }}</h2>
+<form method="post" action="/inspections/save" enctype="multipart/form-data" id="ins-form">
+<input type="hidden" name="ins_id" value="{{ ins.id if ins else 0 }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="items_json" id="items_json">
+<input type="hidden" name="problems_json" id="problems_json">
+
+<div class="card">
+  <h3>一、基本信息</h3>
+  <div class="form-grid">
+    <label>被检查企业*<select name="enterprise_id" required>
+      <option value="">— 请选择 —</option>
+      {% for e in ents %}<option value="{{ e.id }}" {% if ins and ins.enterprise_id==e.id %}selected{% endif %}>{{ e.name }}（{{ e.license_type }}）</option>{% endfor %}
+    </select></label>
+    <label>检查表模板<select name="template_id" id="tpl_sel">
+      <option value="0">— 不用模板，自选检查项 —</option>
+      {% for t in tpls %}<option value="{{ t.id }}" {% if ins and ins.template_id==t.id %}selected{% endif %}>{{ t.name }}（v{{ t.version }}）</option>{% endfor %}
+    </select></label>
+    <label>检查类型*<select name="check_type">{% for t in CHECK_TYPES %}<option {% if ins and ins.check_type==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label>复查关联的原记录（复查时选用，审计 P2-10）<select name="parent_id">
+      <option value="0">— 不关联 —</option>
+      {% for r in recents %}<option value="{{ r.id }}" {% if ins and ins.parent_id==r.id %}selected{% endif %}>{{ r.code }}（{{ r.check_date }} {{ r.check_type }}）</option>{% endfor %}
+    </select></label>
+    <label>关联检查计划项（自动核销计划进度）<select name="plan_item_id">
+      <option value="0">— 不关联 —</option>
+      {% for p in plan_items %}<option value="{{ p.id }}" {% if ins and ins.plan_item_id==p.id %}selected{% endif %}>{{ p.title }}·{{ p.check_type }}{{ '·' + p.period if p.period else '' }}（计划{{ p.count_plan }}家次）</option>{% endfor %}
+    </select></label>
+    <label>检查方式<select name="check_mode">{% for m in CHECK_MODES %}<option {% if ins and ins.check_mode==m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+    <label>检查日期*<input type="date" name="check_date" value="{{ ins.check_date if ins else '' }}" required></label>
+    <label>检查地点<input name="location" value="{{ ins.location if ins else '' }}"></label>
+    <label>检查人员（多人逗号分隔）*<input name="inspectors" value="{{ ins.inspectors if ins else '' }}" required placeholder="张三、李四"></label>
+    <label>整改期限<input type="date" name="deadline" value="{{ ins.deadline if ins else '' }}"></label>
+    <label>检查结论*<select name="conclusion" required>
+      {% for c in ['未发现问题','责发整改','移送线索'] %}<option {% if ins and ins.conclusion==c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select></label>
+  </div>
+  <label>结论说明<textarea name="conclusion_note" rows="2">{{ ins.conclusion_note if ins else '' }}</textarea></label>
+  <label>检查现场材料附件（照片等，可多选）<input type="file" name="files" multiple></label>
+</div>
+
+<div class="card">
+  <h3>二、逐项检查结果 <span class="muted" id="item-count">（请在上方选择检查表模板，或点“自选检查项”手动勾选）</span></h3>
+  <details>
+    <summary style="cursor:pointer;color:var(--primary)">＋ 自选检查项（不使用模板时）</summary>
+    <div id="picker"></div>
+    <p><button type="button" class="btn-gray" id="btn-picker">按勾选项生成检查表</button></p>
+  </details>
+  <div id="items-box"></div>
+</div>
+
+<div class="card">
+  <h3>三、问题与整改要求 <span class="muted">（勾选“不符合”项会自动带出问题，可编辑补充）</span></h3>
+  <div id="probs-box"></div>
+  <p><button type="button" class="btn-gray" id="btn-addprob">＋ 手动添加问题</button></p>
+  <label>问题默认整改期限（单条问题未单独填写时使用）<input type="date" id="prob_deadline" value="{{ ins.deadline if ins else '' }}"></label>
+</div>
+
+<p><button type="button" id="btn-submit">{{ '保存修改（草稿）' if ins else '保存登记（草稿）' }}</button>　<a class="btn btn-gray" href="/inspections">取消</a></p>
+</form>
+
+<script src="/static/autosave.js"></script>
+<script nonce="{{ request.state.nonce }}">
+const TPL_ITEMS = {{ tpl_items|tojson }};
+const INS_ID = {{ ins.id if ins else 0 }};
+const ALL_LIST = {{ all_items|tojson }};
+// 所有来自数据库的文本都要经 esc() 再插入 innerHTML，避免存储型 XSS（审计 P0-2）
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ALL_ITEMS = {};
+ALL_LIST.forEach(it => ALL_ITEMS[it.id] = it);   // 自选清单=项目库全部启用项（审计 P2-8）
+let current = [];   // 当前检查项 [{...item}]
+let probs = [];
+
+function loadTpl(){
+  const tid = document.getElementById('tpl_sel').value;
+  current = (TPL_ITEMS[tid] || []).map(x => ({...x}));
+  renderItems();
+  renderProbs();
+}
+
+function buildFromPicker(){
+  const ids = [...document.querySelectorAll('#picker .pk:checked')].map(x=>parseInt(x.value));
+  if(!ids.length){alert('请先勾选检查项');return;}
+  current = ids.map(id => ({...ALL_ITEMS[id]})).filter(Boolean);
+  renderItems(); renderProbs();
+}
+
+function renderPicker(){
+  const box = document.getElementById('picker');
+  if(box.dataset.built) return;
+  const byCat = {};
+  ALL_LIST.forEach(it => {
+    (byCat[it.category] = byCat[it.category] || []).push(it);
+  });
+  let html = '';
+  for (const cat in byCat){
+    html += '<h4>' + esc(cat) + '</h4>';
+    byCat[cat].forEach(it => {
+      html += '<label style="display:block"><input type="checkbox" class="pk" value="' + esc(it.id) + '"> ' +
+              esc(it.code) + '　' + esc(it.name) + '　<span class="muted">' + esc(it.legal_basis) + '</span></label>';
+    });
+  }
+  box.innerHTML = html;
+  box.dataset.built = '1';
+}
+
+function renderItems(){
+  const box = document.getElementById('items-box');
+  document.getElementById('item-count').innerText = '（共 ' + current.length + ' 项）';
+  box.innerHTML = current.map((it, i) => `
+    <div class="item-row">
+      <div class="head">
+        <span class="code">${esc(it.code)}</span><b>${esc(it.name)}</b>
+        ${it.is_key ? '<span class="badge b-review">重点</span>' : ''}
+        ${it.is_veto ? '<span class="badge b-returned">否决</span>' : ''}
+        <span class="muted">${esc(it.method)}　${esc(it.score)}分</span>
+        <span style="margin-left:auto">
+          检查结果：
+          <select data-res="${i}" id="res-${i}" style="width:100px">
+            <option value="" ${it.result ? '' : 'selected'}>请选择</option>
+            ${['符合','不符合','不适用'].map(o => `<option ${it.result===o?'selected':''}>${o}</option>`).join('')}
+          </select>
+        </span>
+      </div>
+      <div class="basis">检查内容：${esc(it.content)}</div>
+      <div class="basis">检查依据：${esc(it.legal_basis)}</div>
+      <div class="basis">判定标准：${esc(it.criteria)}</div>
+      <label>情况描述<textarea rows="2" data-finding="${i}">${esc(it.finding || '')}</textarea></label>
+    </div>`).join('');
+}
+
+function onResult(i, sel){
+  current[i].result = sel.value;
+  const it = current[i];
+  if (sel.value === '不符合'){
+    if (!probs.find(p => p.item_idx === i)){
+      probs.push({
+        item_idx: i, item_id: it.id,
+        description: it.name + '：' + (current[i].finding || it.content).slice(0, 80),
+        basis: it.legal_basis,
+        requirement: '',
+        to_msa: /移送海事/.test(it.note || '') || /第38条/.test(it.legal_basis || ''),
+      });
+    }
+  } else {
+    probs = probs.filter(p => p.item_idx !== i);
+  }
+  renderProbs();
+}
+
+function addProb(){
+  probs.push({item_idx: null, item_id: null, description: '', basis: '', requirement: '', to_msa: false});
+  renderProbs();
+}
+
+function renderProbs(){
+  const box = document.getElementById('probs-box');
+  if (!probs.length){ box.innerHTML = '<p class="muted">暂无问题（检查结果选“不符合”将自动登记问题）</p>'; return; }
+  box.innerHTML = probs.map((p, j) => `
+    <div class="item-row">
+      <div class="head"><b>问题 P${j + 1}</b>
+        ${p.item_id ? '<span class="muted">关联检查项 #' + esc(p.item_id) + '</span>' : ''}
+        <label style="margin-left:auto"><input type="checkbox" ${p.to_msa?'checked':''} data-msa="${j}"> 移送海事</label>
+        <button type="button" class="btn-sm btn-red" data-delprob="${j}">删除</button>
+      </div>
+      <label>问题描述*<textarea rows="2" data-pf="${j}:description">${esc(p.description || '')}</textarea></label>
+      <label>违反的法律条款<textarea rows="2" data-pf="${j}:basis">${esc(p.basis || '')}</textarea></label>
+      <label>整改要求*<textarea rows="2" data-pf="${j}:requirement">${esc(p.requirement || '')}</textarea></label>
+      <div class="form-grid">
+        <label>整改期限（留空用默认）<input type="date" value="${esc(p.deadline || '')}" data-pf="${j}:deadline"></label>
+        <label>责任人<input value="${esc(p.responsible || '')}" data-pf="${j}:responsible"></label>
+      </div>
+    </div>`).join('');
+}
+
+function submitForm(){
+  const miss = current.filter(it => !it.result).length;
+  if (miss){ alert(`还有 ${miss} 项未选择检查结果（符合/不符合/不适用），请逐项点选后再保存`); return; }
+  const dl = document.getElementById('prob_deadline').value;
+  probs.forEach(p => { p.deadline = (p.deadline || dl || ''); });
+  if (probs.some(p => !p.description.trim() || !p.requirement.trim())){
+    alert('问题描述和整改要求均不能为空'); return;
+  }
+  document.getElementById('items_json').value = JSON.stringify(current.map(it => ({
+    code: it.code, category: it.category, name: it.name, content: it.content, basis: it.legal_basis,
+    method: it.method, criteria: it.criteria, is_key: it.is_key, is_veto: it.is_veto,
+    score: it.score, result: it.result, finding: it.finding || ''
+  })));
+  document.getElementById('problems_json').value = JSON.stringify(probs.map(p => ({
+    item_id: p.item_id, description: p.description, basis: p.basis,
+    requirement: p.requirement, deadline: p.deadline || '', responsible: p.responsible || '', to_msa: p.to_msa
+  })));
+  document.forms[0].submit();
+}
+
+/* ---- 事件委托（CSP 无 unsafe-inline，不使用内联处理器） ---- */
+document.getElementById('tpl_sel').addEventListener('change', loadTpl);
+document.getElementById('btn-picker').addEventListener('click', buildFromPicker);
+document.getElementById('btn-addprob').addEventListener('click', addProb);
+document.getElementById('btn-submit').addEventListener('click', submitForm);
+document.getElementById('ins-form').addEventListener('submit', () => { window.AS && window.AS.clear(); });
+document.getElementById('items-box').addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.res !== undefined) { onResult(+t.dataset.res, t); return; }
+  if (t.dataset.finding !== undefined && current[+t.dataset.finding]) {
+    current[+t.dataset.finding].finding = t.value;
+  }
+});
+document.getElementById('probs-box').addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.msa !== undefined && probs[+t.dataset.msa]) { probs[+t.dataset.msa].to_msa = t.checked; return; }
+  if (t.dataset.pf !== undefined && probs[+t.dataset.pf.split(':')[0]]) {
+    const [j, field] = t.dataset.pf.split(':');
+    probs[+j][field] = t.value;
+  }
+});
+document.getElementById('probs-box').addEventListener('click', e => {
+  const t = e.target.closest('[data-delprob]');
+  if (t) { probs.splice(+t.dataset.delprob, 1); renderProbs(); }
+});
+
+renderPicker();
+{% if ins_items %}
+current = {{ ins_items|tojson }};
+renderItems();
+{% endif %}
+{% if ins_probs %}
+probs = {{ ins_probs|tojson }};
+renderProbs();
+{% endif %}
+/* 自动保存：防误退出/误刷新丢失登记内容（附件需重新选择） */
+window.AS = initAutosave({
+  key: 'ins_' + INS_ID,
+  formId: 'ins-form',
+  getState: () => ({ current, probs }),
+  setState: d => { current = d.current || []; probs = d.probs || []; renderItems(); renderProbs(); }
+});
+</script>
+{% endblock %}

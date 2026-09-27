@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:560px;margin:40px auto;text-align:center">
+  <h2 style="font-size:42px;margin:8px 0">{{ code }}</h2>
+  <p>{{ msg }}</p>
+  <p class="form-inline" style="justify-content:center">
+    <a class="btn" href="/">返回工作台</a>
+    <a class="btn btn-gray" href="#" data-back>返回上一页</a>
+  </p>
+</div>
+{% endblock %}

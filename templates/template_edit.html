@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ '编辑检查表（保存后版本递增）' if tpl else '设计新检查表' }}</h2>
+<form method="post" action="/templates/save">
+  <input type="hidden" name="tid" value="{{ tpl.id if tpl else 0 }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="item_ids" id="item_ids" value="">
+  <div class="form-grid">
+    <label>检查表名称*<input name="name" value="{{ tpl.name if tpl else '' }}" required></label>
+  </div>
+  <label>说明<textarea name="description" rows="2">{{ tpl.description if tpl else '' }}</textarea></label>
+
+  <h3>勾选检查项（已选 <span id="cnt">0</span> 项）</h3>
+  {% set ns = namespace(cur='') %}
+  {% for it in items %}
+    {% if it.category != ns.cur %}{% set ns.cur = it.category %}<h4 style="color:var(--primary)">{{ it.category }}</h4>{% endif %}
+    <label class="item-row" style="display:block;margin:4px 0;padding:8px">
+      <div class="head">
+        <input type="checkbox" class="ck" value="{{ it.id }}" {% if it.id in chosen %}checked{% endif %}>
+        <span class="code">{{ it.code }}</span><b>{{ it.name }}</b>
+        {% if it.is_key %}<span class="badge b-review">重点</span>{% endif %}
+        {% if it.is_veto %}<span class="badge b-returned">否决</span>{% endif %}
+        <span class="muted">{{ it.method }} · {{ it.score }}分</span>
+      </div>
+      <div class="basis">{{ it.content }}</div>
+      <div class="basis">依据：{{ it.legal_basis }}</div>
+    </label>
+  {% endfor %}
+  <p><button type="submit">保存检查表</button>
+     <a class="btn btn-gray" href="/templates">返回</a></p>
+</form>
+<script nonce="{{ request.state.nonce }}">
+function collect(){
+  const ids=[...document.querySelectorAll('.ck:checked')].map(x=>x.value);
+  document.getElementById('item_ids').value=ids.join(',');
+  document.getElementById('cnt').innerText=ids.length;
+}
+// 事件委托（CSP 无 unsafe-inline）：勾选变化即收集；提交前收齐
+document.querySelector('form').addEventListener('change', e => {
+  if (e.target.classList && e.target.classList.contains('ck')) collect();
+});
+document.querySelector('form').addEventListener('submit', collect);
+collect();
+</script>
+{% endblock %}

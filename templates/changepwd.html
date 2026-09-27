@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>修改密码</h2>
+<div class="card" style="max-width:420px">
+  {% if user.must_change_pwd %}<p class="result-ng">您使用的是初始密码，首次登录必须修改后才能使用系统。</p>{% endif %}
+  <form method="post" action="/changepwd">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if not user.must_change_pwd %}
+    <label>原密码<input name="old_password" type="password" required></label>
+    {% endif %}
+    <label>新密码（至少6位）<input name="new_password" type="password" required minlength="6"></label>
+    <label>确认新密码<input name="new_password2" type="password" required></label>
+    <button>确认修改</button>
+  </form>
+</div>
+{% endblock %}

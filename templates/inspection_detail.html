@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>检查记录详情　{{ ins.code }}
+  <span class="badge b-{{ ins.status }}">{{ REC_STATUS_CN[ins.status] }}</span>
+</h2>
+{% if ins.archived_at %}<p class="muted">已归档：{{ ins.archived_at }}　归档包：{{ ins.archive_file }}（记录内容已锁定）</p>{% endif %}
+{% if parent %}<p class="muted">🔁 本记录是对 <a href="/inspections/{{ parent.id }}">{{ parent.code }}</a>（{{ parent.check_date }} {{ parent.check_type }}）的复查</p>{% endif %}
+{% if children %}<p class="muted">🔍 该记录的复查记录：{% for c in children %}<a href="/inspections/{{ c.id }}">{{ c.code }}</a>（{{ c.check_date }} {{ c.check_type }}·{{ REC_STATUS_CN[c.status] }}）　{% endfor %}</p>{% endif %}
+
+{% if corrections %}
+<div class="card">
+  <h3>📋 更正留痕记录</h3>
+  {% for c in corrections %}
+  <p class="muted">{{ c.created_at }}　{{ c.username }}　{{ c.detail }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if ins.status=='archived' %}
+<div class="card" style="border-color:#8e44ad">
+  <h3 style="color:#8e44ad">📦 该记录已归档锁定</h3>
+  <p>归档时间：{{ ins.archived_at }}　归档包：{{ ins.archive_file }}。锁定后检查内容、整改反馈、复核意见均不可修改，保证归档件真实完整。</p>
+  {% if is_admin %}
+  <details>
+    <summary style="cursor:pointer;color:var(--danger)">发起更正留痕（解除锁定，全程留痕）</summary>
+    <form method="post" action="/inspections/{{ ins.id }}/reopen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>更正理由*<textarea name="reason" rows="2" required placeholder="如：整改附件上传错误，需重新上传"></textarea></label>
+      <button class="btn-sm btn-red">确认解除锁定</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>基本信息</h3>
+  <div class="detail-grid">
+    <div><span>被检查企业：</span>{{ ins.ent_name }}</div>
+    <div><span>信用代码：</span>{{ ins.credit_code }}</div>
+    <div><span>许可证号：</span>{{ ins.license_no }}</div>
+    <div><span>检查日期：</span>{{ ins.check_date }}</div>
+    <div><span>检查类型：</span>{{ ins.check_type }}</div>
+    <div><span>检查方式：</span>{{ ins.check_mode }}</div>
+    <div><span>检查地点：</span>{{ ins.location }}</div>
+    <div><span>检查人员：</span>{{ ins.inspectors }}</div>
+    <div><span>整改期限：</span>{{ ins.deadline }}</div>
+    <div><span>检查结论：</span>{{ ins.conclusion }}</div>
+  </div>
+  {% if ins.conclusion_note %}<p>结论说明：{{ ins.conclusion_note }}</p>{% endif %}
+  <p class="form-inline">
+    <a class="btn" href="/inspections/{{ ins.id }}/print" target="_blank">🖨 打印检查表</a>
+    <a class="btn btn-sm" href="/inspections/{{ ins.id }}/doc/record">下载 现场检查记录表 PDF</a>
+    <a class="btn btn-sm" href="/inspections/{{ ins.id }}/doc/notice">下载 问题清单及整改要求 PDF</a>
+    <a class="btn btn-sm" href="/inspections/{{ ins.id }}/doc/feedback">下载 整改情况报告 PDF</a>
+    <a class="btn btn-sm" href="/inspections/{{ ins.id }}/doc/review">下载 复核意见 PDF</a>
+    <a class="btn btn-sm btn-green" href="/inspections/{{ ins.id }}/download">⬇ 全部材料打包下载（ZIP）</a>
+    {% if is_gov and ins.status!='archived' %}
+    <form style="display:inline" method="post" action="/inspections/{{ ins.id }}/archive"
+          data-confirm="生成归档包并锁定该记录？锁定后内容不可修改，更正须走“更正留痕”。">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-sm btn-gray" title="生成归档包、保存到 data\archives 并锁定该记录">📦 归档并锁定</button>
+    </form>
+    {% endif %}
+    {% if is_gov and ins.status=='draft' %}
+    <a class="btn btn-sm btn-gray" href="/inspections/new?edit={{ ins.id }}">编辑草稿</a>
+    <form style="display:inline" method="post" action="/inspections/{{ ins.id }}/delete"
+          data-confirm="确认删除该草稿？">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn-sm btn-red">删除草稿</button>
+    </form>
+    <form style="display:inline" method="post" action="/inspections/{{ ins.id }}/issue">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn-sm">下发（企业可见）</button>
+    </form>
+    {% endif %}
+    {% if is_gov and ins.status=='review' %}
+    <form style="display:inline" method="post" action="/inspections/{{ ins.id }}/close">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn-sm btn-gray">直接闭环（全部通过后自动）</button>
+    </form>
+    {% endif %}
+  </p>
+  {% if ins_atts %}
+  <p>检查现场材料：{% for a in ins_atts %}{% if a.filename.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp','.bmp')) %}<a href="/attachments/{{ a.id }}" target="_blank"><img src="/attachments/{{ a.id }}?inline=1" class="sign-img" alt="{{ a.filename }}" title="{{ a.filename }}"></a> {% endif %}<a href="/attachments/{{ a.id }}">📎 {{ a.filename }}</a>　{% endfor %}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>签字确认</h3>
+  <div class="detail-grid">
+    <div><span>检查人员：</span>
+      {% if signs.insp %}<b>✅ {{ signs.insp.signer_name }}</b>（{{ signs.insp.signed_at }}）
+        <img src="/signatures/{{ signs.insp.id }}" class="sign-img" alt="检查人员签名">{% else %}<span class="muted">未签字</span>{% endif %}
+    </div>
+    <div><span>被检查企业：</span>
+      {% if signs.ent %}<b>✅ {{ signs.ent.signer_name }}</b>（{{ signs.ent.signed_at }}）
+        <img src="/signatures/{{ signs.ent.id }}" class="sign-img" alt="企业签名">{% else %}<span class="muted">未签字</span>{% endif %}
+    </div>
+  </div>
+  {% if ins.status != 'archived' %}
+  <p class="form-inline">
+    {% if is_gov and ins.status=='draft' %}<a class="btn" href="/onsite?edit={{ ins.id }}">📱 现场登记（手机适配）</a>{% endif %}
+    {% if not signs.insp or not signs.ent %}
+    <button type="button" class="btn btn-green" data-show="sign-zone">✍ 手写签字确认</button>
+    {% endif %}
+  </p>
+  <div id="sign-zone" style="display:none">
+    {% if not signs.insp %}
+    <form method="post" action="/inspections/{{ ins.id }}/sign" id="sign-insp">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="sign_type" value="insp">
+      <input type="hidden" name="image" value="">
+      <label>检查人员（签字人姓名）<input name="signer_name" required placeholder="如 李检查员"></label>
+      <canvas id="pad-insp" class="sign-pad"></canvas>
+      <p class="form-inline">
+        <button type="button" class="btn-sm btn-gray" id="clr-insp">重签</button>
+        <button type="button" class="btn-sm btn-green" data-sign="sign-insp:pad-insp">确认检查人员签字</button>
+      </p>
+    </form>
+    {% endif %}
+    {% if not signs.ent %}
+    <form method="post" action="/inspections/{{ ins.id }}/sign" id="sign-ent">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="sign_type" value="ent">
+      <input type="hidden" name="image" value="">
+      <label>被检查企业负责人（签字人姓名）<input name="signer_name" required placeholder="如 王船长"></label>
+      <canvas id="pad-ent" class="sign-pad"></canvas>
+      <p class="form-inline">
+        <button type="button" class="btn-sm btn-gray" id="clr-ent">重签</button>
+        <button type="button" class="btn-sm btn-green" data-sign="sign-ent:pad-ent">确认企业签字</button>
+      </p>
+    </form>
+    {% endif %}
+    <p class="muted">说明：企业代表可在检查人员终端上手签（审计注明"现场代录"）；企业用户登录后也可自行签署企业签字栏。</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>逐项检查结果（{{ items|length }}项）</h3>
+  <table>
+    <tr><th>序号</th><th>编号</th><th>检查项目</th><th>检查内容</th><th>检查依据</th><th>方法</th><th>结果</th><th>情况记录</th></tr>
+    {% for it in items %}
+    <tr>
+      <td>{{ loop.index }}</td><td>{{ it.item_code }}</td><td>{{ it.item_name }}</td>
+      <td>{{ it.item_content }}</td><td>{{ it.legal_basis }}</td><td>{{ it.method }}</td>
+      <td class="{% if it.result=='符合' %}result-ok{% elif it.result=='不符合' %}result-ng{% else %}result-na{% endif %}">{{ it.result }}</td>
+      <td>{{ it.finding }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h3>问题与整改（{{ probs|length }}项）</h3>
+{% for p in probs %}
+<div class="prob-card">
+  <h4>{{ p.seq_label }}　{{ p.description }}
+    {% if p.to_msa %}<span class="badge b-returned">移送海事</span>{% endif %}
+    <span class="badge b-{{ p.status }}">{{ PROB_STATUS_CN[p.status] }}</span>
+  </h4>
+  <div class="basis">违反条款：{{ p.legal_basis }}</div>
+  <div class="basis">整改要求：{{ p.requirement }}</div>
+  <div class="basis">整改期限：{{ p.deadline }}　责任人：{{ p.responsible }}</div>
+  {% if p.atts %}<div class="basis">附件：{% for a in p.atts %}{% if a.filename.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp','.bmp')) %}<a href="/attachments/{{ a.id }}" target="_blank"><img src="/attachments/{{ a.id }}?inline=1" class="sign-img" alt="{{ a.filename }}" title="{{ a.filename }}"></a> {% endif %}<a href="/attachments/{{ a.id }}">📎 {{ a.filename }}</a>　{% endfor %}</div>{% endif %}
+
+  {% for f in p.feedbacks %}
+  <div class="fb-block">
+    <b>整改反馈 第{{ f.round }}轮</b>（{{ f.submitter }}　{{ f.submitted_at }}）<br>
+    问题认识/原因分析：{{ f.reason }}<br>
+    整改措施：{{ f.measure }}<br>
+    完成情况：{{ f.completion }}　完成日期：{{ f.done_date }}
+  </div>
+  {% endfor %}
+
+  {% for r in p.reviews %}
+  <div class="rv-block">
+    <b>复核意见</b>（{{ r.reviewer }}　{{ r.reviewed_at }}）：
+    <span class="{% if r.result=='pass' %}result-ok{% else %}result-ng{% endif %}">{{ '通过' if r.result=='pass' else '退回' }}</span><br>
+    意见：{{ r.opinion }}{% if r.recheck_date %}　复查日期：{{ r.recheck_date }}{% endif %}
+    {% if r.recheck_note %}<br>复查情况：{{ r.recheck_note }}{% endif %}
+  </div>
+  {% endfor %}
+
+  {% if (user.role=='enterprise' or not is_gov) and p.status in ('pending','returned') and ins.status!='archived' %}
+  <details {% if p.status=='returned' %}open{% endif %}>
+    <summary style="cursor:pointer;color:var(--primary)">✎ 整改反馈（{{ '重新整改' if p.status=='returned' else '填写' }}）</summary>
+    <form method="post" action="/problems/{{ p.id }}/feedback" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>问题认识 / 原因分析<textarea name="reason" rows="2"></textarea></label>
+      <label>整改措施*<textarea name="measure" rows="3" required></textarea></label>
+      <label>完成情况<textarea name="completion" rows="2"></textarea></label>
+      <label>完成日期<input type="date" name="done_date"></label>
+      <label>整改证明附件（整改前后照片、制度文件、证书扫描件等，可多选）<input type="file" name="files" multiple></label>
+      <button class="btn-sm btn-green">提交整改反馈</button>
+    </form>
+  </details>
+  {% endif %}
+
+  {% if is_gov and p.status=='submitted' %}
+  <details open>
+    <summary style="cursor:pointer;color:var(--primary)">✔ 复核</summary>
+    <form method="post" action="/problems/{{ p.id }}/review">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>复核结论*<select name="result"><option value="pass">通过</option><option value="reject">退回重新整改</option></select></label>
+      <label>复核意见<textarea name="opinion" rows="2"></textarea></label>
+      <label>复查日期<input type="date" name="recheck_date"></label>
+      <label>复查情况（现场复查时填写）<textarea name="recheck_note" rows="2"></textarea></label>
+      <button class="btn-sm btn-green">提交复核</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% else %}
+<p class="muted">本次检查未发现问题。</p>
+{% endfor %}
+<script src="/static/signpad.js"></script>
+<script nonce="{{ request.state.nonce }}">
+initSignPad('pad-insp', 'clr-insp');
+initSignPad('pad-ent', 'clr-ent');
+// 签字按钮委托（CSP 无 unsafe-inline）
+document.addEventListener('click', e => {
+  const t = e.target.closest ? e.target.closest('[data-sign]') : null;
+  if (t) {
+    const [formId, canvasId] = t.dataset.sign.split(':');
+    submitSign(formId, canvasId);
+  }
+});
+</script>
+{% endblock %}

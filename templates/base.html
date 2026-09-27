@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+{% if user %}<meta name="csrf" content="{{ csrf }}">{% endif %}
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% if user %}
+<header class="topbar">
+  <div class="brand">{{ APP_NAME }}</div>
+  <nav>
+    <a href="/">工作台</a>
+    {% if user.role in ('gov_admin','gov_staff','sysadmin') %}
+    <a href="/inspections">检查记录</a>
+    <a href="/inspections/new">登记检查</a>
+    <a href="/onsite">📱现场登记</a>
+    <a href="/templates">检查表设计</a>
+    <a href="/items">检查项目库</a>
+    <a href="/enterprises">企业名录</a>
+    {% else %}
+    <a href="/inspections">检查记录</a>
+    <a href="/overdue">整改督办</a>
+    <a href="/enterprises/{{ user.enterprise_id }}/profile">企业信息与船舶</a>
+    {% endif %}
+    <a href="/messages">🔔 消息提醒</a>
+    {% if user.role in ('gov_admin','gov_staff') %}<a href="/plans">检查计划</a><a href="/overdue">督办台账</a><a href="/stats">统计分析</a><a href="/random">双随机抽查</a>{% endif %}
+    {% if user.role in ('gov_admin','sysadmin') %}<a href="/users">用户管理</a><a href="/audit">操作日志</a>{% endif %}
+  </nav>
+  <div class="userbox">{{ user.real_name }}（{{ ROLES[user.role] }}）<a href="/changepwd">改密</a><a href="/logout">退出</a></div>
+</header>
+{% endif %}
+<main class="container">
+{% if msg %}<div class="flash">{{ msg }}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+<footer class="footer">水路运输企业检查记录管理平台 · 检查内容依据《国内水路运输管理条例》（2023修订）、《国内水路运输管理规定》（2020修正）、《安全生产法》（2021修正）</footer>
+<script nonce="{{ request.state.nonce }}">
+// 全局事件委托（CSP 无 unsafe-inline，页面不写内联处理器）：
+// data-confirm="提示"      表单提交前确认
+// data-show="元素id"       点击显示元素
+// data-submit              值变化时提交所在表单
+// data-back                点击返回上一页
+document.addEventListener('submit', e => {
+  const m = e.target.dataset ? e.target.dataset.confirm : '';
+  if (m && !window.confirm(m)) e.preventDefault();
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest ? e.target.closest('[data-show]') : null;
+  if (t) { const el = document.getElementById(t.dataset.show); if (el) el.style.display = 'block'; }
+  const b = e.target.closest ? e.target.closest('[data-back]') : null;
+  if (b) { e.preventDefault(); history.back(); }
+  const pr = e.target.closest ? e.target.closest('[data-print]') : null;
+  if (pr) window.print();
+});
+document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.submit !== undefined) {
+    const f = e.target.closest('form'); if (f) f.submit();
+  }
+});
+</script>
+</body>
+</html>

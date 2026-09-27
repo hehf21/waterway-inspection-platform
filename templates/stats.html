@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>统计分析</h2>
+<form class="form-inline" method="get">
+  <input type="date" name="date_from" value="{{ d_from }}" title="检查日期起" style="width:150px">
+  <span class="muted">至</span>
+  <input type="date" name="date_to" value="{{ d_to }}" title="检查日期止" style="width:150px">
+  <button>按时间段统计</button>
+  <a class="btn btn-gray" href="/stats">不限时间</a>
+  <a class="btn" href="/stats/export?date_from={{ d_from }}&amp;date_to={{ d_to }}">导出统计 Excel</a>
+</form>
+
+<div class="card">
+  <h3>按企业统计</h3>
+  {% set mx_ent = (by_ent | map(attribute='ins_cnt') | list | max) if by_ent else 1 %}
+  <table>
+    <tr><th>企业名称</th><th style="width:22%">检查次数</th><th>发现问题</th><th>已整改销号</th><th>整改完成率</th></tr>
+    {% for r in by_ent %}
+    <tr>
+      <td>{{ r.name }}</td>
+      <td><div class="bar"><div class="bar-fill" style="width:{{ (r.ins_cnt / mx_ent * 100) | round | int if mx_ent else 0 }}%"></div></div>
+          {{ r.ins_cnt }} 次</td>
+      <td>{{ r.prob_cnt }}</td><td>{{ r.pass_cnt }}</td>
+      <td>
+        {% if r.prob_cnt %}
+        <div class="bar"><div class="bar-fill {{ 'warn' if r.pass_cnt < r.prob_cnt }}" style="width:{{ (r.pass_cnt / r.prob_cnt * 100) | round | int }}%"></div></div>
+        {{ '%.1f'|format(r.pass_cnt / r.prob_cnt * 100) }}%
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">暂无数据</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>按检查类型</h3>
+  {% set mx_type = (by_type | map(attribute='c') | list | max) if by_type else 1 %}
+  <table>
+    <tr><th>检查类型</th><th style="width:60%">分布</th><th>次数</th></tr>
+    {% for r in by_type %}
+    <tr>
+      <td>{{ r.check_type }}</td>
+      <td><div class="bar"><div class="bar-fill" style="width:{{ (r.c / mx_type * 100) | round | int if mx_type else 0 }}%"></div></div></td>
+      <td>{{ r.c }}</td>
+    </tr>
+    {% else %}<tr><td colspan="3" class="muted">暂无数据</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>问题类别分布（高频问题分析）</h3>
+  {% set mx_cat = (by_cat | map(attribute='c') | list | max) if by_cat else 1 %}
+  <table>
+    <tr><th>检查项类别</th><th style="width:60%">分布</th><th>问题数</th></tr>
+    {% for r in by_cat %}
+    <tr>
+      <td>{{ r.category }}</td>
+      <td><div class="bar"><div class="bar-fill warn" style="width:{{ (r.c / mx_cat * 100) | round | int if mx_cat else 0 }}%"></div></div></td>
+      <td>{{ r.c }}</td>
+    </tr>
+    {% else %}<tr><td colspan="3" class="muted">暂无数据</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

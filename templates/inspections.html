@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>检查记录</h2>
+<form class="form-inline" method="get">
+  <input name="q" value="{{ q }}" placeholder="企业/编号/检查人员/地点" style="width:200px">
+  <select name="enterprise_id">
+    <option value="0">全部企业</option>
+    {% for e in ents %}<option value="{{ e.id }}" {% if f_ent==e.id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+  </select>
+  <select name="check_type">
+    <option value="">全部类型</option>
+    {% for t in CHECK_TYPES %}<option {% if f_type==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+  </select>
+  <select name="check_mode">
+    <option value="">全部方式</option>
+    {% for m in CHECK_MODES %}<option {% if f_mode==m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+  </select>
+  <select name="conclusion">
+    <option value="">全部结论</option>
+    {% for c in CONCLUSIONS %}<option {% if f_concl==c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
+  <select name="status">
+    <option value="">全部状态</option>
+    {% for k, v in REC_STATUS_CN.items() %}<option value="{{ k }}" {% if k==status %}selected{% endif %}>{{ v }}</option>{% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ d_from }}" title="检查日期起" style="width:150px">
+  <span class="muted">至</span>
+  <input type="date" name="date_to" value="{{ d_to }}" title="检查日期止" style="width:150px">
+  <button>查询</button>
+  <a class="btn btn-gray" href="/inspections">重置</a>
+  {% if user.role in ('gov_admin','gov_staff') %}
+  <a class="btn" href="/inspections/new">＋登记检查</a>
+  <button type="button" class="btn-green" id="batch-btn"
+          title="勾选多条打成一个归档包；其中已闭环的记录将同时转为“已归档”并锁定">批量打包归档勾选</button>
+  <button type="button" class="btn" id="batch-print-btn" title="勾选多条检查表合成一份 A4 文档一次打印">🖨 批量打印检查表</button>
+  {% endif %}
+</form>
+<p class="muted">共 {{ total }} 条记录{% if q or status or f_ent or f_type or f_mode or f_concl or d_from or d_to %}（已按筛选条件过滤）{% endif %}；勾选多条可批量打包归档。</p>
+<form id="batchform" method="post" action="/archives/batch" style="display:none">
+  <input name="ids" id="batch-ids">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+<table>
+  <tr>
+    {% if user.role in ('gov_admin','gov_staff') %}<th>选</th>{% endif %}
+    <th>检查编号</th><th>企业</th><th>检查日期</th><th>类型</th><th>方式</th><th>检查人员</th><th>结论</th><th>状态</th><th>归档</th><th>操作</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    {% if user.role in ('gov_admin','gov_staff') %}<td><input type="checkbox" class="sel" value="{{ r.id }}">{% endif %}</td>
+    <td>{{ r.code }}</td><td>{{ r.ent_name }}</td><td>{{ r.check_date }}</td><td>{{ r.check_type }}</td>
+    <td>{{ r.check_mode }}</td><td>{{ r.inspectors }}</td><td>{{ r.conclusion }}</td>
+    <td><span class="badge b-{{ r.status }}">{{ REC_STATUS_CN[r.status] }}</span></td>
+    <td class="muted">{{ r.archived_at[:10] if r.archived_at else '—' }}</td>
+    <td>
+      <a class="btn btn-sm" href="/inspections/{{ r.id }}">查看</a>
+      <a class="btn btn-sm btn-green" href="/inspections/{{ r.id }}/download">打包下载</a>
+      {% if user.role in ('gov_admin','gov_staff') and r.status=='draft' %}
+      <a class="btn btn-sm btn-gray" href="/inspections/new?edit={{ r.id }}">编辑</a>
+      <form style="display:inline" method="post" action="/inspections/{{ r.id }}/delete"
+            data-confirm="确认删除草稿 {{ r.code }}？">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-red">删除</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="11" class="muted">暂无记录</td></tr>{% endfor %}
+</table>
+<p class="form-inline">
+  {% if p > 1 %}<a class="btn btn-sm btn-gray" href="/inspections?{{ qs }}&amp;p={{ p-1 }}">上一页</a>{% endif %}
+  <span class="muted">第 {{ p }} / {{ pages }} 页（每页 50 条）</span>
+  {% if p < pages %}<a class="btn btn-sm btn-gray" href="/inspections?{{ qs }}&amp;p={{ p+1 }}">下一页</a>{% endif %}
+</p>
+<script nonce="{{ request.state.nonce }}">
+function batchDownload(){
+  const ids=[...document.querySelectorAll('.sel:checked')].map(x=>x.value);
+  if(!ids.length){alert('请先勾选检查记录');return;}
+  document.getElementById('batch-ids').value=ids.join(',');
+  document.getElementById('batchform').submit();
+}
+const bb = document.getElementById('batch-btn');
+if (bb) bb.addEventListener('click', batchDownload);
+const bp = document.getElementById('batch-print-btn');
+if (bp) bp.addEventListener('click', () => {
+  const ids = [...document.querySelectorAll('.sel:checked')].map(x => x.value);
+  if (!ids.length) { alert('请先勾选检查记录'); return; }
+  window.open('/print-batch?ids=' + ids.join(','), '_blank');
+});
+</script>
+{% endblock %}

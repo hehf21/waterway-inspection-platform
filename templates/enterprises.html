@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>企业名录</h2>
+<form class="form-inline" method="get">
+  <input name="q" value="{{ q }}" placeholder="企业名称 / 信用代码" style="width:260px">
+  <button>查询</button>
+  {% if user.role in ('gov_admin','sysadmin') %}
+  <button type="button" data-show="entform">＋新增企业</button>
+  <button type="button" class="btn-green" data-show="importform">⇪ 批量导入企业</button>
+  {% endif %}
+</form>
+
+{% if user.role in ('gov_admin','sysadmin') %}
+<div class="card" id="importform" style="display:none">
+  <h3>批量导入企业名录</h3>
+  <p class="muted">先下载模板填写后上传（.xlsx）；按企业名称/信用代码去重，重复行自动跳过。</p>
+  <p><a class="btn btn-gray" href="/enterprises/template">下载导入模板（.xlsx）</a></p>
+  <form method="post" action="/enterprises/import" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>选择填好的文件<input type="file" name="file" accept=".xlsx" required></label>
+    <button>开始导入</button>
+  </form>
+</div>
+{% endif %}
+
+{% if user.role in ('gov_admin','sysadmin') %}
+<div class="card" id="entform" style="display:none">
+  <h3 id="entform-title">新增企业</h3>
+  <form method="post" action="/enterprises/save">
+    <input type="hidden" name="eid" id="f-eid" value="0">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>企业名称*<input name="name" id="f-name" required></label>
+      <label>统一社会信用代码<input name="credit_code" id="f-code"></label>
+      <label>经营许可证号<input name="license_no" id="f-lic"></label>
+      <label>经营类别
+        <select name="license_type" id="f-type">
+          <option>普通货物运输</option><option>危险货物运输</option><option>旅客运输</option>
+          <option>船舶管理业务</option><option>船舶代理/客货代理</option><option>其他</option>
+        </select>
+      </label>
+      <label>法定代表人<input name="legal_person" id="f-person"></label>
+      <label>安全联系人<input name="contact" id="f-contact"></label>
+      <label>联系电话<input name="phone" id="f-phone"></label>
+      <label>地址<input name="address" id="f-addr"></label>
+    </div>
+    <label>核定经营范围<textarea name="scope" id="f-scope" rows="2"></textarea></label>
+    <label>备注<textarea name="remark" id="f-remark" rows="2"></textarea></label>
+    <button>保存</button>
+  </form>
+</div>
+{% endif %}
+
+<table>
+  <tr><th>ID</th><th>企业名称</th><th>信用代码</th><th>许可证号</th><th>经营类别</th><th>法人</th><th>联系人</th><th>电话</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.credit_code }}</td><td>{{ r.license_no }}</td>
+    <td>{{ r.license_type }}</td><td>{{ r.legal_person }}</td><td>{{ r.contact }}</td><td>{{ r.phone }}</td>
+    <td><a class="btn btn-sm" href="/enterprises/{{ r.id }}/profile">一企一档</a>
+        {% if user.role in ('gov_admin','sysadmin') %}
+        <a class="btn btn-sm btn-gray" href="#" data-edit-ent
+           data-id="{{ r.id }}" data-name="{{ r.name }}" data-code="{{ r.credit_code }}"
+           data-lic="{{ r.license_no }}" data-type="{{ r.license_type }}" data-person="{{ r.legal_person }}"
+           data-contact="{{ r.contact }}" data-phone="{{ r.phone }}" data-addr="{{ r.address }}"
+           data-scope="{{ r.scope }}" data-remark="{{ r.remark }}">编辑</a>
+        {% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="muted">暂无企业，请先新增</td></tr>{% endfor %}
+</table>
+<p class="form-inline">
+  {% if p > 1 %}<a class="btn btn-sm btn-gray" href="/enterprises?q={{ q }}&amp;p={{ p-1 }}">上一页</a>{% endif %}
+  <span class="muted">第 {{ p }} / {{ pages }} 页（共 {{ total }} 家，每页 50 家）</span>
+  {% if p < pages %}<a class="btn btn-sm btn-gray" href="/enterprises?q={{ q }}&amp;p={{ p+1 }}">下一页</a>{% endif %}
+</p>
+
+<script nonce="{{ request.state.nonce }}">
+function editEnt(id,name,code,lic,type,person,contact,phone,addr,scope,remark){
+  document.getElementById('entform').style.display='block';
+  document.getElementById('entform-title').innerText='编辑企业 #'+id;
+  const set=(k,v)=>{const el=document.getElementById(k); if(el) el.value=v??'';};
+  set('f-eid',id);set('f-name',name);set('f-code',code);set('f-lic',lic);set('f-type',type);
+  set('f-person',person);set('f-contact',contact);set('f-phone',phone);set('f-addr',addr);
+  set('f-scope',scope);set('f-remark',remark);
+  window.scrollTo(0,0);
+}
+// 事件绑定：数据经 data-* 属性传递（HTML 转义），不再拼接内联 JS（审计 P0-2）
+document.querySelectorAll('[data-edit-ent]').forEach(a => a.addEventListener('click', ev => {
+  ev.preventDefault();
+  const d = a.dataset;
+  editEnt(d.id, d.name, d.code, d.lic, d.type, d.person, d.contact, d.phone, d.addr, d.scope, d.remark);
+}));
+</script>
+{% endblock %}

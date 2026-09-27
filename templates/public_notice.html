@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>双随机抽查结果公示</h2>
+<p class="muted">{{ org }}　依据“双随机、一公开”监管要求，随机抽取检查对象、随机选派执法检查人员，抽取过程以随机种子存档、可复现复核。</p>
+
+{% if closed %}
+<div class="card"><p class="muted">公示暂未开放。</p></div>
+{% else %}
+{% for b in batches %}
+<div class="card">
+  <h3>{{ b.t }}　{{ b.type }}</h3>
+  <p class="muted">随机种子：{{ b.seed }}（凭本种子可在同一批企业名单下复现抽取结果）</p>
+  <table>
+    <tr><th>序号</th><th>被检查企业</th><th>检查结论</th><th>检查日期</th></tr>
+    {% for e in b.ents %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ e.name }}</td>
+      <td>{{ e.conclusion }}</td>
+      <td>{{ e.date or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="card"><p class="muted">暂无公示内容。</p></div>
+{% endfor %}
+{% endif %}
+
+<p class="muted">说明：本页仅公示抽取结果与检查结论，不含检查人员信息与问题细节；对公示内容有异议的，可向 {{ org }} 反映。</p>
+{% endblock %}

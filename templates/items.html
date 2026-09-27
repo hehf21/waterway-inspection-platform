@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>检查项目库（51项 · 依据现行法规条款）</h2>
+<form class="form-inline" method="get">
+  <select name="category" data-submit>
+    <option value="">全部类别</option>
+    {% for c in cats %}<option {% if c==category %}selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
+  {% if user.role=='gov_admin' %}
+  <button type="button" data-show="itemform">＋新增检查项</button>
+  {% endif %}
+  <a class="btn btn-gray" href="/items/export?fmt=docx">导出 Word 清单</a>
+  <a class="btn btn-gray" href="/items/export?fmt=xlsx">导出 Excel</a>
+  <span class="muted">检查表设计时从本库选取；已下发的历史检查记录保留当时快照，不受后续修改影响。</span>
+</form>
+
+{% if user.role=='gov_admin' %}
+<div class="card" id="itemform" style="display:none">
+  <h3 id="itemform-title">新增检查项</h3>
+  <form method="post" action="/items/save">
+    <input type="hidden" name="iid" id="f-iid" value="0">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>编号*（如A09）<input name="code" id="f-code" required></label>
+      <label>类别*<input name="category" id="f-cat" placeholder="如 A 资质与证照" required></label>
+      <label>检查项目*<input name="name" id="f-name" required></label>
+      <label>检查方法*<input name="method" id="f-method" placeholder="查资料/查现场/查台账/询问" required></label>
+      <label>分值<input name="score" id="f-score" type="number" value="3"></label>
+      <label>适用范围<input name="scope" id="f-scope"></label>
+    </div>
+    <label>检查内容*<textarea name="content" id="f-content" rows="2" required></textarea></label>
+    <label>检查依据（法规名称+条款号）*<textarea name="legal_basis" id="f-basis" rows="2" required></textarea></label>
+    <label>判定标准*<textarea name="criteria" id="f-criteria" rows="2" required></textarea></label>
+    <div class="form-inline">
+      <label><input type="checkbox" name="is_key" id="f-key" value="1"> 重点项</label>
+      <label><input type="checkbox" name="is_veto" id="f-veto" value="1"> 否决项</label>
+    </div>
+    <label>备注<input name="note" id="f-note"></label>
+    <button>保存</button>
+  </form>
+</div>
+{% endif %}
+
+{% for r in rows %}
+<div class="item-row">
+  <div class="head">
+    <span class="code">{{ r.code }}</span>
+    <b>{{ r.name }}</b>
+    <span class="muted">{{ r.category }}</span>
+    {% if r.is_key %}<span class="badge b-review">重点项</span>{% endif %}
+    {% if r.is_veto %}<span class="badge b-returned">否决项</span>{% endif %}
+    <span class="muted">{{ r.score }}分 · {{ r.method }}</span>
+    {% if not r.active %}<span class="badge b-draft">已停用</span>{% endif %}
+    {% if user.role=='gov_admin' %}
+    <span style="margin-left:auto">
+      <a class="btn btn-sm btn-gray" href="#" data-edit-item
+         data-id="{{ r.id }}" data-code="{{ r.code }}" data-cat="{{ r.category }}"
+         data-name="{{ r.name }}" data-method="{{ r.method }}" data-score="{{ r.score }}"
+         data-scope="{{ r.scope }}" data-content="{{ r.content }}" data-basis="{{ r.legal_basis }}"
+         data-criteria="{{ r.criteria }}" data-note="{{ r.note }}"
+         data-key="{{ r.is_key }}" data-veto="{{ r.is_veto }}">编辑</a>
+      <form style="display:inline" method="post" action="/items/{{ r.id }}/toggle"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-gray">{{ '启用' if not r.active else '停用' }}</button></form>
+    </span>
+    {% endif %}
+  </div>
+  <div class="basis">检查内容：{{ r.content }}</div>
+  <div class="basis">检查依据：{{ r.legal_basis }}</div>
+  <div class="basis">判定标准：{{ r.criteria }}{% if r.scope %}　|　适用：{{ r.scope }}{% endif %}{% if r.note %}　|　备注：{{ r.note }}{% endif %}</div>
+</div>
+{% endfor %}
+
+<script nonce="{{ request.state.nonce }}">
+function editItem(id,code,cat,name,method,score,scope,content,basis,criteria,note,key,veto){
+  document.getElementById('itemform').style.display='block';
+  document.getElementById('itemform-title').innerText='编辑检查项 #'+id;
+  const set=(k,v)=>{const el=document.getElementById(k); if(el) el.value=v??'';};
+  set('f-iid',id);set('f-code',code);set('f-cat',cat);set('f-name',name);set('f-method',method);
+  set('f-score',score);set('f-scope',scope);set('f-content',content);set('f-basis',basis);
+  set('f-criteria',criteria);set('f-note',note);
+  document.getElementById('f-key').checked=!!key;
+  document.getElementById('f-veto').checked=!!veto;
+  window.scrollTo(0,0);
+}
+// 事件绑定：数据经 data-* 属性传递（HTML 转义），不再拼接内联 JS（审计 P0-2）
+document.querySelectorAll('[data-edit-item]').forEach(a => a.addEventListener('click', ev => {
+  ev.preventDefault();
+  const d = a.dataset;
+  editItem(d.id, d.code, d.cat, d.name, d.method, d.score, d.scope,
+           d.content, d.basis, d.criteria, d.note, d.key === '1', d.veto === '1');
+}));
+</script>
+{% endblock %}

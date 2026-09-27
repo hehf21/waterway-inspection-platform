@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>用户管理</h2>
+<p class="form-inline">
+  <form method="post" action="/admin/backup" style="display:inline">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn-green">⬇ 一键备份数据（数据库+全部附件）</button>
+  </form>
+  <span class="muted">备份包含 app.db 与 uploads 全部附件，附恢复说明；建议定期备份。</span>
+</p>
+<div class="card">
+  <h3 id="uf-title">新增用户</h3>
+  <form method="post" action="/users/save">
+    <input type="hidden" name="uid" id="u-id" value="0">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>登录账号*<input name="username" id="u-name" required></label>
+      <label>密码（留空不改；新增默认123456，首次登录强制改密）<input name="password" id="u-pass" type="password"></label>
+      <label>姓名*<input name="real_name" id="u-real" required></label>
+      <label>角色*<select name="role" id="u-role">
+        {% for k, v in ROLES.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+      </select></label>
+      <label>所属企业（企业用户必选）<select name="enterprise_id" id="u-ent">
+        <option value="0">—</option>
+        {% for e in ents %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+      </select></label>
+      <label>电话<input name="phone" id="u-phone"></label>
+    </div>
+    <button>保存</button>
+  </form>
+</div>
+<table>
+  <tr><th>ID</th><th>账号</th><th>姓名</th><th>角色</th><th>所属企业</th><th>电话</th><th>状态</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.id }}</td><td>{{ r.username }}</td><td>{{ r.real_name }}</td>
+    <td>{{ ROLES[r.role] }}</td><td>{{ r.ent_name or '—' }}</td><td>{{ r.phone }}</td>
+    <td>{{ '正常' if r.active else '停用' }}</td>
+    <td>
+      <a class="btn btn-sm btn-gray" href="#" data-edit-user
+         data-id="{{ r.id }}" data-username="{{ r.username }}" data-real="{{ r.real_name }}"
+         data-role="{{ r.role }}" data-eid="{{ r.enterprise_id or 0 }}" data-phone="{{ r.phone }}">编辑</a>
+      <form style="display:inline" method="post" action="/users/{{ r.id }}/toggle"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-gray">{{ '停用' if r.active else '启用' }}</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<script nonce="{{ request.state.nonce }}">
+function editUser(id,username,real,role,eid,phone){
+  document.getElementById('uf-title').innerText='编辑用户 #'+id;
+  const set=(k,v)=>{document.getElementById(k).value=v??'';};
+  set('u-id',id);set('u-name',username);set('u-real',real);set('u-role',role);set('u-ent',eid||0);set('u-phone',phone);
+  window.scrollTo(0,0);
+}
+// 事件委托：数据经 data-* 属性传递（HTML 转义），CSP 无 unsafe-inline（审计 P0-2/CSP）
+document.querySelectorAll('[data-edit-user]').forEach(a => a.addEventListener('click', ev => {
+  ev.preventDefault();
+  const d = a.dataset;
+  editUser(d.id, d.username, d.real, d.role, d.eid, d.phone);
+}));
+</script>
+{% endblock %}

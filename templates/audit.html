@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>操作日志（共 {{ total }} 条，第 {{ p }}/{{ pages }} 页）</h2>
+<form class="form-inline" method="get">
+  <input name="q" value="{{ q }}" placeholder="用户 / 操作 / 详情" style="width:240px"><button>查询</button>
+</form>
+<table>
+  <tr><th>时间</th><th>用户</th><th>操作</th><th>对象</th><th>对象ID</th><th>详情</th><th>改动前后</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.created_at }}</td><td>{{ r.username }}</td><td>{{ r.action }}</td>
+      <td>{{ r.entity }}</td><td>{{ r.entity_id }}</td><td>{{ r.detail }}</td>
+      <td>{% if r.before or r.after %}<details><summary style="cursor:pointer">查看</summary>
+        <div class="muted" style="white-space:pre-wrap;word-break:break-all;max-width:380px">改前：{{ r.before }}<br>改后：{{ r.after }}</div>
+      </details>{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">暂无日志</td></tr>{% endfor %}
+</table>
+<p class="form-inline">
+  {% if p > 1 %}<a class="btn btn-sm btn-gray" href="/audit?q={{ q }}&amp;p={{ p-1 }}">上一页</a>{% endif %}
+  <span class="muted">第 {{ p }} / {{ pages }} 页</span>
+  {% if p < pages %}<a class="btn btn-sm btn-gray" href="/audit?q={{ q }}&amp;p={{ p+1 }}">下一页</a>{% endif %}
+</p>
+{% endblock %}

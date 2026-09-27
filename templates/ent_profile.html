@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>一企一档 · {{ ent.name }}</h2>
+
+<div class="stat-grid">
+  <div class="stat"><div class="num">{{ ins_rows|length }}</div><div>历次检查</div></div>
+  <div class="stat"><div class="num">{{ p_total }}</div><div>发现问题</div></div>
+  <div class="stat"><div class="num">{{ p_pass }}</div><div>已整改销号</div></div>
+  <div class="stat"><div class="num">{{ rate }}</div><div>整改完成率</div></div>
+  <div class="stat warn"><div class="num">{{ p_over }}</div><div>逾期未整改</div></div>
+  <div class="stat"><div class="num">{{ ships|length }}</div><div>在册船舶</div></div>
+</div>
+
+<div class="card">
+  <h3>企业基本信息</h3>
+  <div class="detail-grid">
+    <div><span>统一社会信用代码：</span>{{ ent.credit_code }}</div>
+    <div><span>经营许可证号：</span>{{ ent.license_no }}</div>
+    <div><span>经营类别：</span>{{ ent.license_type }}</div>
+    <div><span>法定代表人：</span>{{ ent.legal_person }}</div>
+    <div><span>安全联系人：</span>{{ ent.contact }}</div>
+    <div><span>联系电话：</span>{{ ent.phone }}</div>
+    <div><span>地址：</span>{{ ent.address }}</div>
+    <div><span>核定经营范围：</span>{{ ent.scope }}</div>
+  </div>
+  {% if ent.remark %}<p class="muted">备注：{{ ent.remark }}</p>{% endif %}
+
+  {% if user.role == 'enterprise' %}
+  <details>
+    <summary style="cursor:pointer;color:var(--primary)">✎ 维护本企业联系信息（安全联系人/电话/地址）</summary>
+    <form method="post" action="/enterprises/self">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="form-grid">
+        <label>安全联系人<input name="contact" value="{{ ent.contact }}"></label>
+        <label>联系电话<input name="phone" value="{{ ent.phone }}"></label>
+        <label>地址<input name="address" value="{{ ent.address }}"></label>
+      </div>
+      <button class="btn-sm">保存</button>
+    </form>
+    <p class="muted">说明：企业名称、许可证、经营范围等资质信息由主管部门维护，如需变更请联系检查员。</p>
+  </details>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>所属船舶清单（{{ ships|length }}艘）</h3>
+  <table>
+    <tr><th>船名</th><th>登记号</th><th>船型</th><th>载重吨</th><th>总吨</th><th>建成日期</th><th>营业运输证号</th><th>证书情况</th>{% if user.role in ('enterprise','gov_admin','sysadmin') %}<th></th>{% endif %}</tr>
+    {% for s in ships %}
+    <tr>
+      <td>{{ s.name }}</td><td>{{ s.ship_no }}</td><td>{{ s.ship_type }}</td>
+      <td>{{ s.dwt }}</td><td>{{ s.gt }}</td><td>{{ s.built_date }}</td>
+      <td>{{ s.license_no }}</td><td>{{ s.cert_status }}</td>
+      {% if user.role in ('enterprise','gov_admin','sysadmin') %}
+      <td>
+        <a class="btn btn-sm btn-gray" href="#" data-edit-ship
+           data-id="{{ s.id }}" data-name="{{ s.name }}" data-shipno="{{ s.ship_no }}"
+           data-shiptype="{{ s.ship_type }}" data-dwt="{{ s.dwt }}" data-gt="{{ s.gt }}"
+           data-built="{{ s.built_date }}" data-lic="{{ s.license_no }}"
+           data-cert="{{ s.cert_status }}" data-remark="{{ s.remark }}">编辑</a>
+        <form style="display:inline" method="post" action="/ships/{{ s.id }}/delete"
+              data-confirm="确认删除船舶 {{ s.name }}？">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn-sm btn-red">删除</button>
+        </form>
+      </td>
+      {% endif %}
+    </tr>
+    {% else %}<tr><td colspan="9" class="muted">暂无船舶记录</td></tr>{% endfor %}
+  </table>
+
+  {% if user.role in ('enterprise','gov_admin','sysadmin') %}
+  <details {% if not ships %}open{% endif %}>
+    <summary style="cursor:pointer;color:var(--primary)">＋ 新增/编辑船舶（审计 P2-9）</summary>
+    <form method="post" action="/enterprises/{{ ent.id }}/ships/save">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="sid" id="s-id" value="0">
+      <div class="form-grid">
+        <label>船名*<input name="name" id="s-name" required></label>
+        <label>登记号/IMO<input name="ship_no" id="s-shipno"></label>
+        <label>船型/种类<input name="ship_type" id="s-shiptype" placeholder="如 普通货船/客船/危险品船"></label>
+        <label>载重吨<input name="dwt" id="s-dwt"></label>
+        <label>总吨<input name="gt" id="s-gt"></label>
+        <label>建成日期<input name="built_date" id="s-built" placeholder="如 2018-06"></label>
+        <label>营业运输证号<input name="license_no" id="s-lic"></label>
+        <label>证书情况<input name="cert_status" id="s-cert" placeholder="如 登记/检验证书齐全有效"></label>
+      </div>
+      <label>备注<input name="remark" id="s-remark"></label>
+      <button class="btn-sm">保存船舶</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>历次检查记录</h3>
+  <table>
+    <tr><th>检查编号</th><th>检查日期</th><th>类型</th><th>方式</th><th>检查人员</th><th>结论</th><th>状态</th><th></th></tr>
+    {% for r in ins_rows %}
+    <tr>
+      <td>{{ r.code }}</td><td>{{ r.check_date }}</td><td>{{ r.check_type }}</td><td>{{ r.check_mode }}</td>
+      <td>{{ r.inspectors }}</td><td>{{ r.conclusion }}</td>
+      <td><span class="badge b-{{ r.status }}">{{ REC_STATUS_CN[r.status] }}</span></td>
+      <td><a class="btn btn-sm" href="/inspections/{{ r.id }}">查看</a></td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">暂无检查记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>问题与整改台账</h3>
+  <table>
+    <tr><th>问题编号</th><th>所属检查</th><th>检查日期</th><th>问题描述</th><th>整改要求</th><th>整改期限</th><th>责任人</th><th>状态</th></tr>
+    {% for p in probs %}
+    <tr>
+      <td>{{ p.seq_label }}</td><td>{{ p.ins_code }}</td><td>{{ p.check_date }}</td>
+      <td>{{ p.description[:60] }}</td><td>{{ p.requirement[:50] }}</td><td>{{ p.deadline }}</td>
+      <td>{{ p.responsible }}</td>
+      <td><span class="badge b-{{ p.status }}">{{ PROB_STATUS_CN[p.status] }}</span></td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">暂无问题记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<script nonce="{{ request.state.nonce }}">
+// 事件绑定：数据经 data-* 属性传递（HTML 转义），不拼接内联 JS（审计 P0-2）
+document.querySelectorAll('[data-edit-ship]').forEach(a => a.addEventListener('click', ev => {
+  ev.preventDefault();
+  const d = a.dataset;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
+  set('s-id', d.id); set('s-name', d.name); set('s-shipno', d.shipno); set('s-shiptype', d.shiptype);
+  set('s-dwt', d.dwt); set('s-gt', d.gt); set('s-built', d.built); set('s-lic', d.lic);
+  set('s-cert', d.cert); set('s-remark', d.remark);
+  window.scrollTo(0, 0);
+}));
+</script>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>双随机抽查（随机抽取检查对象 · 随机选派检查人员）</h2>
+
+<div class="card">
+  <h3>发起抽取</h3>
+  <p class="muted">当前企业名录 <b>{{ ent_cnt }}</b> 家、可派检查员 <b>{{ inspectors|length }}</b> 人
+    （启用中的政府管理员/检查员）。抽样使用随机种子并入档，任何人可用同一企业池按种子复现抽取结果，验证抽样公正。</p>
+  <form method="post" action="/random/draw">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>抽查类型
+        <select name="draw_type">
+          <option value="double">双随机（企业＋检查员都随机）</option>
+          <option value="single">仅随机抽取企业（检查员另行指定）</option>
+        </select>
+      </label>
+      <label>抽取企业数*<input type="number" name="ent_count" value="5" min="1" max="200" required></label>
+      <label>随机选派检查员数<input type="number" name="insp_count" value="2" min="1" max="5"></label>
+      <label>排除近 N 天已检查企业（0=不排除）<input type="number" name="exclude_days" value="90" min="0" max="365"></label>
+    </div>
+    <p class="form-inline">
+      <label><input type="checkbox" name="make_drafts" value="1" checked> 同时生成检查草稿（每家企业一条，检查类型"双随机抽查"、检查人员自动填入）</label>
+    </p>
+    <label>备注<input name="note" placeholder="如：2026 年第四季度双随机抽查"></label>
+    <button>开始抽取</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>抽取记录（最近 50 批）</h3>
+  <table>
+    <tr><th>时间</th><th>类型</th><th>抽中企业</th><th>选派检查员</th><th>随机种子</th><th>生成草稿</th><th>备注</th><th></th></tr>
+    {% for d in draws %}
+    <tr>
+      <td>{{ d.created_at }}</td>
+      <td>{{ '双随机' if d.draw_type=='double' else '随机抽企业' }}</td>
+      <td>{{ d.ent_names | join('、') }}</td>
+      <td>{{ d.insp_names | join('、') if d.insp_names else '—' }}</td>
+      <td class="muted">{{ d.seed }}</td>
+      <td>{% for i in d.draft_ids %}<a href="/inspections/{{ i }}">#{{ i }}</a> {% else %}—{% endfor %}</td>
+      <td>{{ d.note }}</td>
+      <td><a class="btn btn-sm btn-gray" href="/random/{{ d.id }}/export">导出结果表</a></td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">暂无抽取记录</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

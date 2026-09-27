@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>整改督办台账</h2>
+
+<h3 style="color:var(--danger)">⚠ 已逾期未整改（{{ rows|length }}项）</h3>
+<table>
+  <tr><th>问题</th><th>所属检查</th><th>企业</th><th>问题描述</th><th>整改要求</th><th>整改期限</th><th>逾期天数</th><th>状态</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>P{{ r.seq }}</td><td>{{ r.ins_code }}</td><td>{{ r.ent_name }}</td>
+    <td>{{ r.description[:50] }}</td><td>{{ r.requirement[:50] }}</td><td>{{ r.deadline }}</td>
+    <td class="result-ng">{{ r.days_over }} 天</td>
+    <td><span class="badge b-{{ r.status }}">{{ PROB_STATUS_CN[r.status] }}</span></td>
+    <td><a class="btn btn-sm" href="/inspections/{{ r.inspection_id }}">处理</a></td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="muted">没有逾期问题 👍</td></tr>{% endfor %}
+</table>
+
+<h3 style="color:#e67e22">⏰ 7天内即将到期（{{ soon|length }}项）</h3>
+<table>
+  <tr><th>问题</th><th>所属检查</th><th>企业</th><th>问题描述</th><th>整改期限</th><th>剩余天数</th><th>状态</th><th></th></tr>
+  {% for r in soon %}
+  <tr>
+    <td>P{{ r.seq }}</td><td>{{ r.ins_code }}</td><td>{{ r.ent_name }}</td>
+    <td>{{ r.description[:50] }}</td><td>{{ r.deadline }}</td>
+    <td>{{ '今天到期' if r.days_left == 0 else r.days_left ~ ' 天' }}</td>
+    <td><span class="badge b-{{ r.status }}">{{ PROB_STATUS_CN[r.status] }}</span></td>
+    <td><a class="btn btn-sm" href="/inspections/{{ r.inspection_id }}">处理</a></td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="muted">近7天没有到期问题</td></tr>{% endfor %}
+</table>
+{% endblock %}

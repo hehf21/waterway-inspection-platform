@@ -1,0 +1,15 @@
+services:
+  slys:
+    build: .
+    container_name: slys-platform
+    ports:
+      - "8098:8098"
+    environment:
+      SLYS_HOST: "0.0.0.0"
+      SLYS_PORT: "8098"
+      # 如需指定固定会话密钥（多实例/迁移时），取消注释并改为≥32位随机串：
+      # SLYS_SECRET: "请替换为32位以上随机串"
+    volumes:
+      # 数据库、附件、归档包、secret.key 全部持久化在此目录
+      - ./data:/app/data
+    restart: unless-stopped

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ '检查计划：' ~ plan.title if plan else '制定新检查计划' }}
+  {% if plan %}<span class="badge b-{{ 'issued' if plan.status=='issued' else 'draft' }}">{{ PLAN_STATUS_CN[plan.status] }}</span>{% endif %}
+</h2>
+
+<div class="card">
+  <h3>计划信息</h3>
+  <form method="post" action="/plans/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="pid" value="{{ plan.id if plan else 0 }}">
+    <div class="form-grid">
+      <label>计划名称*<input name="title" value="{{ plan.title if plan else '' }}" required placeholder="如 2026年度水路运输企业监督检查计划"></label>
+      <label>年度<input type="number" name="year" value="{{ plan.year if plan else 2026 }}" min="2000" max="2100"></label>
+      <label>计划时段<input name="period" value="{{ plan.period if plan else '' }}" placeholder="如 全年 / 上半年 / 第三季度"></label>
+    </div>
+    <label>说明<textarea name="note" rows="2">{{ plan.note if plan else '' }}</textarea></label>
+    <button class="btn-sm">保存计划</button>
+  </form>
+  {% if plan and plan.status=='draft' %}
+  <form style="display:inline" method="post" action="/plans/{{ plan.id }}/issue"
+        data-confirm="下达后计划项将锁定，开始执行跟踪。确认下达？">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn-green">📢 下达计划</button>
+  </form>
+  {% endif %}
+  {% if plan %}<a class="btn btn-gray" href="/plans/{{ plan.id }}/export">导出计划表 Excel</a>{% endif %}
+</div>
+
+{% if plan %}
+<div class="card">
+  <h3>计划项（{{ items|length }} 项）</h3>
+  <table>
+    <tr><th>序</th><th>检查对象 / 适用范围</th><th>检查类型</th><th>计划家次</th><th>计划时段</th>
+        <th>计划检查人员</th><th>已完成</th><th>完成率</th>{% if plan.status=='draft' %}<th></th>{% endif %}</tr>
+    {% for it in items %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ it.ent_name }}</td>
+      <td>{{ it.check_type }}</td>
+      <td>{{ it.count_plan }}</td>
+      <td>{{ it.period or '—' }}</td>
+      <td>{{ it.inspectors or '—' }}</td>
+      <td>{{ it.done }}</td>
+      <td>
+        {% if it.count_plan %}
+        <div class="bar"><div class="bar-fill {{ 'warn' if it.done < it.count_plan }}" style="width:{{ (it.done / it.count_plan * 100) | round | int if it.count_plan else 0 }}%"></div></div>
+        {{ '%.0f'|format(it.done / it.count_plan * 100 if it.done < it.count_plan else 100) }}%
+        {% else %}—{% endif %}
+      </td>
+      {% if plan.status=='draft' %}
+      <td>
+        <a class="btn btn-sm btn-gray" href="#" data-edit-item
+           data-id="{{ it.id }}" data-eid="{{ it.enterprise_id }}" data-scope="{{ it.ent_scope }}"
+           data-type="{{ it.check_type }}" data-count="{{ it.count_plan }}"
+           data-period="{{ it.period }}" data-insp="{{ it.inspectors }}" data-note="{{ it.note }}">编辑</a>
+        <form style="display:inline" method="post" action="/plan_items/{{ it.id }}/delete"
+              data-confirm="确认删除该计划项？">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn-sm btn-red">删除</button>
+        </form>
+      </td>
+      {% endif %}
+    </tr>
+    {% else %}<tr><td colspan="9" class="muted">暂无计划项，请在下方添加</td></tr>{% endfor %}
+  </table>
+
+  {% if plan.status=='draft' %}
+  <details open>
+    <summary style="cursor:pointer;color:var(--primary)">＋ 添加/编辑计划项</summary>
+    <form method="post" action="/plans/{{ plan.id }}/items/save">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="piid" id="pi-id" value="0">
+      <div class="form-grid">
+        <label>指定企业（不指定则填适用范围）<select name="enterprise_id" id="pi-eid">
+          <option value="0">— 不指定企业 —</option>
+          {% for e in ents %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+        </select></label>
+        <label>适用范围描述<input name="ent_scope" id="pi-scope" placeholder="如 全部危险货物运输企业 / 客运企业"></label>
+        <label>检查类型*<select name="check_type" id="pi-type">{% for t in CHECK_TYPES %}<option>{{ t }}</option>{% endfor %}</select></label>
+        <label>计划家次*<input type="number" name="count_plan" id="pi-count" value="1" min="1" max="999" required></label>
+        <label>计划时段<input name="period" id="pi-period" placeholder="如 全年 / Q1 / 3月"></label>
+        <label>计划检查人员<input name="inspectors" id="pi-insp" placeholder="多人逗号分隔"></label>
+      </div>
+      <label>备注<input name="note" id="pi-note"></label>
+      <button class="btn-sm">保存计划项</button>
+    </form>
+  </details>
+  {% else %}
+  <p class="muted">计划已下达，计划项锁定。登记检查记录时在"关联检查计划项"选择对应项，系统自动核销进度。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>执行跟踪说明</h3>
+  <p class="muted">「已完成」= 关联本计划项且非草稿状态的检查记录数（登记检查时选"关联检查计划项"）。
+    一条记录核销一个家次；同一计划项可被多条记录核销，达到计划家次即 100%。</p>
+</div>
+{% endif %}
+
+<script nonce="{{ request.state.nonce }}">
+// 事件绑定：数据经 data-* 传递（HTML 转义），不拼接内联 JS（审计 P0-2）
+document.querySelectorAll('[data-edit-item]').forEach(a => a.addEventListener('click', ev => {
+  ev.preventDefault();
+  const d = a.dataset;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v ?? ''; };
+  set('pi-id', d.id); set('pi-eid', d.eid); set('pi-scope', d.scope); set('pi-type', d.type);
+  set('pi-count', d.count); set('pi-period', d.period); set('pi-insp', d.insp); set('pi-note', d.note);
+  window.scrollTo(0, 0);
+}));
+</script>
+{% endblock %}

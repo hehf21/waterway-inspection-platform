@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>工作台</h2>
+{% if stats.overdue or stats.soon %}
+<div class="flash">⚠ 逾期未整改 <b>{{ stats.overdue }}</b> 项 · 7 天内到期 <b>{{ stats.soon }}</b> 项　<a href="/messages">去消息提醒处理 →</a></div>
+{% endif %}
+<div class="stat-grid">
+  {% if user.role in ('gov_admin','gov_staff') %}
+  <div class="stat"><div class="num">{{ stats.ent }}</div><div>在册企业</div></div>
+  <div class="stat"><div class="num">{{ stats.ins }}</div><div>检查记录</div></div>
+  <div class="stat warn"><div class="num">{{ stats.prob_open }}</div><div>未销号问题</div></div>
+  <div class="stat"><div class="num">{{ stats.prob_review }}</div><div>待复核</div></div>
+  <div class="stat warn"><div class="num">{{ stats.overdue }}</div><div>逾期未整改</div></div>
+  <div class="stat"><div class="num">{{ stats.soon }}</div><div>7天内到期</div></div>
+  <div class="stat"><div class="num">{{ stats.closed }}</div><div>已闭环</div></div>
+  {% else %}
+  <div class="stat"><div class="num">{{ stats.ins }}</div><div>本企业检查记录</div></div>
+  <div class="stat warn"><div class="num">{{ stats.prob_open }}</div><div>待整改问题</div></div>
+  <div class="stat"><div class="num">{{ stats.prob_review }}</div><div>已反馈待复核</div></div>
+  <div class="stat warn"><div class="num">{{ stats.overdue }}</div><div>已逾期</div></div>
+  <div class="stat"><div class="num">{{ stats.soon }}</div><div>7天内到期</div></div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>最近检查记录</h3>
+  <table>
+    <tr><th>检查编号</th><th>企业</th><th>检查日期</th><th>类型</th><th>结论</th><th>状态</th><th></th></tr>
+    {% for r in recent %}
+    <tr>
+      <td>{{ r.code }}</td><td>{{ r.ent_name }}</td><td>{{ r.check_date }}</td><td>{{ r.check_type }}</td>
+      <td>{{ r.conclusion }}</td>
+      <td><span class="badge b-{{ r.status }}">{{ REC_STATUS_CN[r.status] }}</span></td>
+      <td><a class="btn btn-sm" href="/inspections/{{ r.id }}">查看</a></td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="muted">暂无记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+{% if my_todos %}
+<div class="card">
+  <h3>待我整改（{{ my_todos|length }}）</h3>
+  <table>
+    <tr><th>问题</th><th>所属检查</th><th>整改期限</th><th></th></tr>
+    {% for p in my_todos %}
+    <tr>
+      <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td>
+      <td class="{{ 'result-ng' if p.deadline else 'muted' }}">{{ p.deadline or '—' }}</td>
+      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.iid }}">去整改</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if wait_review %}
+<div class="card">
+  <h3>待复核整改（企业已反馈）</h3>
+  <table>
+    <tr><th>问题</th><th>所属检查</th><th>企业</th><th>整改期限</th><th></th></tr>
+    {% for p in wait_review %}
+    <tr>
+      <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
+      <td>{{ p.deadline }}</td>
+      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.inspection_id }}">去复核</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

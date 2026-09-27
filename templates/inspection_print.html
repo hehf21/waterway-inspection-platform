@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>检查表　{{ ins.code }}</title>
+<style>
+  body { font-family: "SimSun", "宋体", serif; font-size: 12pt; color: #000; margin: 0; padding: 12mm; }
+  h1 { text-align: center; font-size: 18pt; margin: 2px 0 4px; }
+  .sub { text-align: center; font-size: 10.5pt; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th, td { border: 1px solid #000; padding: 4px 6px; font-size: 10.5pt; vertical-align: top; word-break: break-all; }
+  th { background: #eef2f6; text-align: center; font-weight: normal; }
+  .meta td:nth-child(odd) { width: 14%; text-align: center; background: #f5f7f9; }
+  .note { font-size: 9pt; }
+  .sign-table td { height: 110px; vertical-align: bottom; text-align: center; }
+  .sign-img { max-height: 85px; display: block; margin: 0 auto 4px; }
+  .result-ng { color: #c00; font-weight: bold; }
+  .result-ok { color: #060; }
+  .noprint { text-align: center; margin: 10px 0; }
+  .noprint button, .noprint a { font-size: 15px; padding: 8px 22px; margin: 0 6px; cursor: pointer; }
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    .noprint { display: none; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="noprint">
+  <button type="button" data-print>🖨 打印本检查表</button>
+  <a href="/inspections/{{ ins.id }}">返回检查记录</a>
+</div>
+
+<h1>水路运输企业现场检查记录表</h1>
+<div class="sub">{{ org }}　　检查（记录）编号：{{ ins.code }}</div>
+
+<table class="meta">
+  <tr><td>被检查企业</td><td>{{ ins.ent_name }}</td><td>统一社会信用代码</td><td>{{ ins.credit_code or '—' }}</td></tr>
+  <tr><td>检查时间</td><td>{{ ins.check_date }}</td><td>检查方式</td><td>{{ ins.check_mode }}</td></tr>
+  <tr><td>检查地点</td><td>{{ ins.location or '—' }}</td><td>检查类型</td><td>{{ ins.check_type }}</td></tr>
+  <tr><td>检查人员</td><td>{{ ins.inspectors }}</td><td>许可证号</td><td>{{ ins.license_no or '—' }}</td></tr>
+  <tr><td>整改期限</td><td>{{ ins.deadline or '—' }}</td><td>记录状态</td><td>{{ ins.status_cn }}</td></tr>
+</table>
+
+<table>
+  <tr><th style="width:4%">序号</th><th style="width:13%">检查项目</th><th style="width:28%">检查内容</th>
+      <th style="width:22%">检查依据</th><th style="width:8%">方法</th><th style="width:8%">结果</th><th>情况记录</th></tr>
+  {% for it in items %}
+  <tr>
+    <td style="text-align:center">{{ loop.index }}</td>
+    <td>{{ it.item_name }}{% if it.is_key %}（重点）{% endif %}</td>
+    <td>{{ it.item_content }}</td>
+    <td>{{ it.legal_basis }}</td>
+    <td>{{ it.method }}</td>
+    <td style="text-align:center" class="{{ 'result-ng' if it.result=='不符合' else ('result-ok' if it.result=='符合' else '') }}">{{ it.result or '—' }}</td>
+    <td>{{ it.finding }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7">未录入检查项</td></tr>
+  {% endfor %}
+</table>
+
+{% if probs %}
+<table>
+  <tr><th style="width:7%">问题编号</th><th style="width:26%">问题描述</th><th style="width:18%">违反的法律条款</th>
+      <th style="width:26%">整改要求</th><th style="width:10%">整改期限</th><th style="width:8%">责任人</th><th style="width:5%">备注</th></tr>
+  {% for p in probs %}
+  <tr>
+    <td style="text-align:center">P{{ p.seq }}</td>
+    <td>{{ p.description }}</td>
+    <td>{{ p.legal_basis }}</td>
+    <td>{{ p.requirement }}</td>
+    <td>{{ p.deadline }}</td>
+    <td>{{ p.responsible }}</td>
+    <td>{{ '移送海事' if p.to_msa else '' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>本次检查未发现问题。</p>
+{% endif %}
+
+<table class="meta">
+  <tr><td>检查结论</td><td colspan="3">{{ ins.conclusion or '—' }}</td></tr>
+  <tr><td>结论说明</td><td colspan="3">{{ ins.conclusion_note or '—' }}</td></tr>
+</table>
+
+<p class="note">本记录一式两份，一份交被检查企业，一份归档。被检查企业拒绝签字的，检查人员应将情况记录在案。</p>
+
+<table class="sign-table">
+  <tr>
+    <td>
+      {% if signs.insp %}<img class="sign-img" src="/signatures/{{ signs.insp.id }}" alt="检查人员签名">{% endif %}
+      检查人员（签字）：{% if signs.insp %}{{ signs.insp.signer_name }}{% else %}　　　　　　　　{% endif %}
+    </td>
+    <td>
+      {% if signs.ent %}<img class="sign-img" src="/signatures/{{ signs.ent.id }}" alt="企业负责人签名">{% endif %}
+      企业负责人（签字）：{% if signs.ent %}{{ signs.ent.signer_name }}{% else %}　　　　　　　　{% endif %}
+    </td>
+  </tr>
+  <tr>
+    <td>日期：{{ signs.insp.signed_at[:10] if signs.insp else '　　年　　月　　日' }}</td>
+    <td>日期：{{ signs.ent.signed_at[:10] if signs.ent else '　　年　　月　　日' }}</td>
+  </tr>
+</table>
+
+<div class="noprint">
+  <button type="button" data-print>🖨 打印本检查表</button>
+  <a href="/inspections/{{ ins.id }}">返回检查记录</a>
+</div>
+
+<script nonce="{{ request.state.nonce }}">
+document.addEventListener('click', e => {
+  if (e.target.closest && e.target.closest('[data-print]')) window.print();
+});
+</script>
+</body>
+</html>

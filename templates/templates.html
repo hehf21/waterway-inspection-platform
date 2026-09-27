@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>检查表设计</h2>
+<p class="muted">从检查项目库勾选组合生成检查表模板；修改保存后版本号自动递增，已下发的历史检查记录保留当时使用的检查项快照。</p>
+<p><a class="btn" href="/templates/0">＋设计新检查表</a></p>
+<table>
+  <tr><th>ID</th><th>检查表名称</th><th>说明</th><th>版本</th><th>检查项数</th><th>创建人</th><th>创建时间</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.description }}</td>
+    <td>v{{ r.version }}</td><td>{{ r.cnt }}</td><td>{{ r.created_by }}</td><td>{{ r.created_at }}</td>
+    <td><a class="btn btn-sm" href="/templates/{{ r.id }}">编辑 / 查看</a>
+        <a class="btn btn-sm btn-gray" href="/templates/{{ r.id }}/export?fmt=docx">导出Word</a>
+        <a class="btn btn-sm btn-gray" href="/templates/{{ r.id }}/export?fmt=xlsx">导出Excel</a>
+        {% if user.role=='gov_admin' %}
+        <form style="display:inline" method="post" action="/templates/{{ r.id }}/toggle">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn btn-sm btn-gray">{{ '启用' if not r.active else '停用' }}</button>
+        </form>
+        {% endif %}
+        {% if not r.active %}<span class="badge b-draft">已停用</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="muted">暂无模板</td></tr>{% endfor %}
+</table>
+{% endblock %}

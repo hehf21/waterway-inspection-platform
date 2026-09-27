@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>检查计划</h2>
+<p class="form-inline">
+  <a class="btn" href="/plans/0">＋ 制定新计划</a>
+  <span class="muted">制定年度/季度检查计划 → 添加计划项 → 下达 → 登记检查时关联计划项自动核销进度。</span>
+</p>
+
+<div class="card">
+  <h3>计划列表</h3>
+  <table>
+    <tr><th>计划名称</th><th>年度</th><th>时段</th><th>状态</th><th>计划项</th>
+        <th style="width:22%">执行进度（已完成/计划家次）</th><th>下达时间</th><th>操作</th></tr>
+    {% for p in rows %}
+    <tr>
+      <td><a href="/plans/{{ p.id }}">{{ p.title }}</a></td>
+      <td>{{ p.year }}</td>
+      <td>{{ p.period }}</td>
+      <td><span class="badge b-{{ 'issued' if p.status=='issued' else 'draft' }}">{{ PLAN_STATUS_CN[p.status] }}</span></td>
+      <td>{{ p.item_cnt }} 项</td>
+      <td>
+        {% if p.plan_total %}
+        <div class="bar"><div class="bar-fill {{ 'warn' if p.done < p.plan_total }}" style="width:{{ (p.done / p.plan_total * 100) | round | int if p.plan_total else 0 }}%"></div></div>
+        {{ p.done }} / {{ p.plan_total }}
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ p.issued_at or '—' }}</td>
+      <td>
+        <a class="btn btn-sm" href="/plans/{{ p.id }}">查看/编辑</a>
+        <a class="btn btn-sm btn-gray" href="/plans/{{ p.id }}/export">导出计划表</a>
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">暂无检查计划</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>消息提醒</h2>
+<p class="muted">逾期 / 临期 / 待复核 / 未签字汇总。{% if webhook_on %}已配置群机器人推送（每日定时，也可手动推送）。
+{% else %}未配置群机器人（设置环境变量 SLYS_WEBHOOK_URL 后可每日自动推送）。{% endif %}</p>
+
+{% if webhook_on %}
+<form method="post" action="/messages/push" style="margin:8px 0">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn-green">📤 立即推送今日提醒到群机器人</button>
+</form>
+{% endif %}
+
+<div class="stat-grid">
+  <div class="stat warn"><div class="num">{{ r.overdue|length }}</div><div>逾期未整改</div></div>
+  <div class="stat"><div class="num">{{ r.soon|length }}</div><div>7天内到期</div></div>
+  <div class="stat"><div class="num">{{ r.wait_review|length }}</div><div>待复核</div></div>
+  <div class="stat warn"><div class="num">{{ r.unsigned|length }}</div><div>未完成签字</div></div>
+</div>
+
+<div class="card">
+  <h3>⚠ 逾期未整改（{{ r.overdue|length }}）</h3>
+  <table>
+    <tr><th>问题</th><th>所属检查</th><th>企业</th><th>整改期限</th><th>状态</th><th></th></tr>
+    {% for p in r.overdue %}
+    <tr>
+      <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
+      <td class="result-ng">{{ p.deadline }}</td>
+      <td>{{ PROB_STATUS_CN[p.status] }}</td>
+      <td><a class="btn btn-sm" href="/inspections/{{ p.iid }}">去处理</a></td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="muted">没有逾期问题 👍</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>⏰ 7天内到期（{{ r.soon|length }}）</h3>
+  <table>
+    <tr><th>问题</th><th>所属检查</th><th>企业</th><th>整改期限</th><th></th></tr>
+    {% for p in r.soon %}
+    <tr>
+      <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
+      <td>{{ p.deadline }}</td>
+      <td><a class="btn btn-sm" href="/inspections/{{ p.iid }}">去处理</a></td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">近7天没有到期问题</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>✔ 待复核（{{ r.wait_review|length }}）</h3>
+  <table>
+    <tr><th>问题</th><th>所属检查</th><th>企业</th><th></th></tr>
+    {% for p in r.wait_review %}
+    <tr>
+      <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
+      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.iid }}">去复核</a></td>
+    </tr>
+    {% else %}<tr><td colspan="4" class="muted">没有待复核事项</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>✍ 未完成签字（{{ r.unsigned|length }}）</h3>
+  <table>
+    <tr><th>检查编号</th><th>企业</th><th>检查日期</th><th></th></tr>
+    {% for i in r.unsigned %}
+    <tr>
+      <td>{{ i.code }}</td><td>{{ i.ent_name }}</td><td>{{ i.check_date }}</td>
+      <td><a class="btn btn-sm" href="/inspections/{{ i.id }}">去签字</a></td>
+    </tr>
+    {% else %}<tr><td colspan="4" class="muted">签字齐全</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

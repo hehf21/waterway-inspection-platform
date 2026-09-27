@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}登录 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="login-box">
+  <h1>{{ APP_NAME }}</h1>
+  <p class="muted">政府工作人员登记检查 · 企业反馈整改 · 全过程打包归档</p>
+  <form method="post" action="/login" id="login-form">
+    <label>账号<input name="username" id="lg-user" required autofocus autocomplete="username"></label>
+    <label>密码<span style="display:flex;gap:6px"><input name="password" id="lg-pw" type="password" required autocomplete="current-password" style="flex:1">
+      <button type="button" id="pw-toggle" class="btn-sm btn-gray">显示</button></span></label>
+    <button type="submit">登 录</button>
+    <p class="muted" style="margin-top:8px"><a href="/public/random">双随机抽查结果公示</a></p>
+  </form>
+</div>
+<script nonce="{{ request.state.nonce }}">
+// 记住账号（本机保存，仅存账号不存密码）+ 密码可见切换
+(function(){
+  const u = document.getElementById('lg-user');
+  try { const saved = localStorage.getItem('slys_last_user'); if (saved) u.value = saved; } catch (e) {}
+  document.getElementById('login-form').addEventListener('submit', () => {
+    try { localStorage.setItem('slys_last_user', u.value || ''); } catch (e) {}
+  });
+  const pw = document.getElementById('lg-pw'), tg = document.getElementById('pw-toggle');
+  tg.addEventListener('click', () => {
+    const show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    tg.textContent = show ? '隐藏' : '显示';
+  });
+})();
+</script>
+{% endblock %}
