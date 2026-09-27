@@ -11,6 +11,7 @@ import secrets
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 
 from config import APP_NAME, HOST, PORT
 from db import init_db, get_db
@@ -29,6 +30,7 @@ import routes_stats
 
 app = FastAPI(title=APP_NAME)
 BASE = os.path.dirname(os.path.abspath(__file__))
+app.add_middleware(GZipMiddleware, minimum_size=1024)   # HTML/JSON 压缩传输（内网/手机访问更顺）
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 init_db()
 

@@ -44,9 +44,13 @@ Write-Host "`n== 检查全绿 ==" -ForegroundColor Green
 
 if ($Push) {
     git add -A
-    git commit -m $Message
-    git push
-    Write-Host "已推送：$Message" -ForegroundColor Green
+    if (-not (git status --porcelain)) {
+        Write-Host "无变更，跳过提交" -ForegroundColor Yellow
+    } else {
+        git commit -m $Message
+        git push
+        Write-Host "已推送：$Message" -ForegroundColor Green
+    }
 } else {
     Write-Host "（未推送。确认无误后用：release.ps1 -Push -Message `"说明`"）"
 }

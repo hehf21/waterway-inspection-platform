@@ -80,14 +80,14 @@ db.py               数据模型、轻量迁移、审计、初始化（51 项检
 pdfgen/zipgen/exportgen   文书 PDF、归档 ZIP、Excel/Word 导出
 db_maintenance.py   数据库体检/备份轮转/演示数据清理/VACUUM
 deploy/             nginx HTTPS 样例、定时备份脚本
-smoke_test.py       174 项全流程回归（隔离数据目录，跑完自动清理）
+smoke_test.py       175 项全流程回归（隔离数据目录，跑完自动清理）
 e2e_test.py         20 项浏览器级 E2E（Playwright：真实点击/签字画板/手机视口/CSP）
 ```
 
 ## 测试
 
 ```bash
-python smoke_test.py          # 174/174 全绿为正常
+python smoke_test.py          # 175/175 全绿为正常
 ```
 
 覆盖：鉴权与会话、越权隔离、XSS/CSRF、状态机、归档锁定与更正、签字、打印、双随机种子可复现、检查计划核销、并发编号唯一、服务端校验等。

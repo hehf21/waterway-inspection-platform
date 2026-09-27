@@ -81,6 +81,13 @@ def csrf_token(uid: int) -> str:
     return _sign(f"csrf:{uid}")
 
 
+def cookie_secure(request: Request) -> bool:
+    """HTTPS（或反代 X-Forwarded-Proto=https）时给 Cookie 加 Secure 标志；
+    纯 HTTP 内网部署不加——否则浏览器拒收 Cookie 导致全员掉线。"""
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    return request.url.scheme == "https" or proto == "https"
+
+
 def bad_csrf(user, token: str) -> bool:
     return not hmac.compare_digest(csrf_token(user["id"]).encode("utf-8"), (token or "").encode("utf-8"))
 

@@ -747,6 +747,15 @@ for _r in _rows:
 check("审计日志哈希链完整（全部入链无断点）",
       _brk == 0 and all(_r["chain_hash"] for _r in _rows), f"{len(_rows)}条 断点{_brk}")
 
+# ========== 27. 会话 Cookie 安全属性 ==========
+_ck = c.post("/login", data={"username": "gov", "password": "gov2026!"},
+             follow_redirects=False).headers.get("set-cookie", "")
+_ck2 = c.post("/login", data={"username": "gov", "password": "gov2026!"}, follow_redirects=False,
+              headers={"X-Forwarded-Proto": "https"}).headers.get("set-cookie", "")
+check("会话Cookie安全属性（HttpOnly+SameSite；HTTPS/反代自动加Secure）",
+      "HttpOnly" in _ck and "SameSite=lax" in _ck and "Secure" not in _ck and "Secure" in _ck2,
+      f"http头={_ck[:80]} / https头={_ck2[:80]}")
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

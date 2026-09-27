@@ -20,16 +20,16 @@ def _reminders(conn, user):
         "SELECT p.*, i.code ins_code, i.id iid, e.name ent_name FROM problems p"
         " JOIN inspections i ON i.id=p.inspection_id LEFT JOIN enterprises e ON e.id=i.enterprise_id"
         " WHERE p.status IN ('pending','returned') AND p.deadline<>'' AND p.deadline<?" + ent_scope +
-        " ORDER BY p.deadline", [today] + ent_args).fetchall()
+        " ORDER BY p.deadline LIMIT 200", [today] + ent_args).fetchall()
     out["soon"] = conn.execute(
         "SELECT p.*, i.code ins_code, i.id iid, e.name ent_name FROM problems p"
         " JOIN inspections i ON i.id=p.inspection_id LEFT JOIN enterprises e ON e.id=i.enterprise_id"
         " WHERE p.status IN ('pending','returned') AND p.deadline>=? AND p.deadline<=?" + ent_scope +
-        " ORDER BY p.deadline", [today, soon] + ent_args).fetchall()
+        " ORDER BY p.deadline LIMIT 200", [today, soon] + ent_args).fetchall()
     out["wait_review"] = conn.execute(
         "SELECT p.*, i.code ins_code, i.id iid, e.name ent_name FROM problems p"
         " JOIN inspections i ON i.id=p.inspection_id LEFT JOIN enterprises e ON e.id=i.enterprise_id"
-        " WHERE p.status='submitted'" + ent_scope + " ORDER BY p.id DESC", ent_args).fetchall()
+        " WHERE p.status='submitted'" + ent_scope + " ORDER BY p.id DESC LIMIT 200", ent_args).fetchall()
     out["unsigned"] = conn.execute(
         "SELECT i.id, i.code, i.check_date, e.name ent_name FROM inspections i"
         " LEFT JOIN enterprises e ON e.id=i.enterprise_id"

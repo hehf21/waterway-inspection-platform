@@ -34,7 +34,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
     conn.commit(); conn.close()
     resp = RedirectResponse("/", status_code=302)
     resp.set_cookie(COOKIE, make_token(row["id"], row["session_rev"]), httponly=True,
-                    max_age=SESSION_DAYS * 86400, samesite="lax")
+                    max_age=SESSION_DAYS * 86400, samesite="lax", secure=cookie_secure(request))
     return resp
 
 
@@ -79,7 +79,7 @@ def changepwd(request: Request, csrf: str = Form(""), old_password: str = Form("
     conn.commit(); conn.close()
     resp = RedirectResponse("/?msg=密码修改成功，其他终端的旧登录已失效", status_code=302)
     resp.set_cookie(COOKIE, make_token(user["id"], new_rev), httponly=True,
-                    max_age=SESSION_DAYS * 86400, samesite="lax")
+                    max_age=SESSION_DAYS * 86400, samesite="lax", secure=cookie_secure(request))
     return resp
 
 
