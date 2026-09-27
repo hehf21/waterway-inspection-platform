@@ -21,6 +21,18 @@ Python FastAPI + SQLite 单文件实现，**零编译、双击启动、免数据
 | 统计考核 | 按企业/类型/问题类别统计、月度考核汇总表（可打印导出）、一企一档、检查表打印与批量打印 |
 | 系统安全 | 会话版本化（改密即废止旧会话）、账号×IP 限速、CSRF、CSP nonce（无 unsafe-inline）、安全响应头、操作日志（含改动前后）、归档防篡改（SHA256） |
 
+## 界面预览
+
+| 工作台 | 现场登记（手机 375px） |
+|:---:|:---:|
+| ![工作台](docs/screenshots/01-dashboard.png) | ![现场登记](docs/screenshots/04-onsite-mobile.png) |
+
+| 登记检查（逐项点选） | 检查记录详情 | 打印检查表（含手写签名） | 消息提醒 |
+|:---:|:---:|:---:|:---:|
+| ![登记检查](docs/screenshots/02-inspection-new.png) | ![记录详情](docs/screenshots/03-detail.png) | ![打印检查表](docs/screenshots/05-print.png) | ![消息提醒](docs/screenshots/06-messages.png) |
+
+> 截图由 `python make_screenshots.py` 自动生成（起隔离实例＋演示数据＋Playwright 截图，可重复生成）。
+
 ## 快速开始
 
 > 需要 **Python 3.9+**（实测 3.12）、Node.js 仅开发期检查用到。
