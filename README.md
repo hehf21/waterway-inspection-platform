@@ -1,5 +1,8 @@
 # 水路运输企业检查记录管理平台
 
+[![CI](https://github.com/hehf21/waterway-inspection-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/hehf21/waterway-inspection-platform/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 面向交通运输主管部门的 **B/S 结构监督检查记录管理系统**：检查计划 → 双随机抽查 → 现场登记（手机适配）→ 双方手写签字 → 企业整改反馈 → 复核归档，全过程材料一键打包、签字自动进文书。检查内容依据《国内水路运输管理条例》《国内水路运输管理规定》《安全生产法》等预置 **51 项检查库**（条款到条、可核对）。
 
 Python FastAPI + SQLite 单文件实现，**零编译、双击启动、免数据库安装**，适合政务内网小规模部署。
@@ -19,6 +22,8 @@ Python FastAPI + SQLite 单文件实现，**零编译、双击启动、免数据
 | 系统安全 | 会话版本化（改密即废止旧会话）、账号×IP 限速、CSRF、CSP nonce（无 unsafe-inline）、安全响应头、操作日志（含改动前后）、归档防篡改（SHA256） |
 
 ## 快速开始
+
+> 需要 **Python 3.9+**（实测 3.12）、Node.js 仅开发期检查用到。
 
 ```bash
 pip install -r requirements.txt

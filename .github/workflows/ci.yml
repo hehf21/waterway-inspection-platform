@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: Python 语法编译
+        run: python -m py_compile app.py webcore.py routes_*.py db.py config.py pdfgen.py zipgen.py exportgen.py seed_items.py smoke_test.py js_syntax_check.py check_docs.py db_maintenance.py
+
+      - name: 168 项全流程回归
+        run: python smoke_test.py
+
+      - name: 内联 JS 语法检查
+        run: python js_syntax_check.py
+
+      - name: 文档口径门禁（回归项数与文档一致）
+        run: python check_docs.py
+
+      - name: 敏感文件门禁（数据/密钥不得入库）
+        run: |
+          set -e
+          BAD=$(git ls-files | grep -E '(^|/)(data|backups)/|secret|\.db$|\.db-(wal|shm)$' || true)
+          if [ -n "$BAD" ]; then echo "疑似敏感文件入库："; echo "$BAD"; exit 1; fi
+          echo "OK"

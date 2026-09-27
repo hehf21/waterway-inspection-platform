@@ -691,5 +691,8 @@ check("全库检查编号唯一", uniq["c"] == uniq["d"], f"{uniq['c']} 条 / {u
 
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
+# 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke_last_run.txt"), "w") as _f:
+    _f.write(str(len(ok)))
 shutil.rmtree(TEST_DATA, ignore_errors=True)
 sys.exit(1 if n_fail else 0)

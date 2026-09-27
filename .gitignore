@@ -11,6 +11,7 @@ data_smoke/
 data_diag*/
 poc_data/
 migrate_test/
+smoke_last_run.txt
 
 # 编辑器/系统
 .DS_Store
