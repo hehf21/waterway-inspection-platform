@@ -795,6 +795,24 @@ check("服务端拒绝空日期/空检查人员/不存在企业（绕过前端�
       and "被检查企业不存在" in _e3.text,
       f"{_e1.status_code}/{_e2.status_code}/{_e3.status_code} e1片段={_e1.text[_e1.text.find('校验'):][:80]!r}")
 
+# ========== 31. 检查项版本历史 / 整改前后图片对比 ==========
+_r = c.get(f"/inspections/{ins_id}")
+check("整改前后对比区（现场照片 vs 反馈照片并排）",
+      "整改前后对比" in _r.text and "整改前（检查现场）" in _r.text and "整改后（企业反馈）" in _r.text)
+_t2 = csrf_of()
+conn = get_db()
+_it = dict(conn.execute("SELECT * FROM check_items ORDER BY id LIMIT 1").fetchone())
+conn.close()
+c.post("/items/save", data={"csrf": _t2, "iid": _it["id"], "code": _it["code"], "category": _it["category"],
+                            "name": _it["name"], "content": _it["content"] + "（修订测试）",
+                            "legal_basis": _it["legal_basis"], "method": _it["method"],
+                            "criteria": _it["criteria"], "is_key": _it["is_key"], "is_veto": _it["is_veto"],
+                            "score": _it["score"], "scope": _it["scope"], "note": _it["note"]},
+       follow_redirects=True)
+_h = c.get(f"/items/{_it['id']}/history")
+check("检查项修改历史存档（改前版本可追溯）",
+      _h.status_code == 200 and "存档版本" in _h.text and "修改前版本存档" in _h.text)
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

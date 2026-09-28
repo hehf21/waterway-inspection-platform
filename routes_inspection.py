@@ -378,9 +378,13 @@ def ins_detail(request: Request, ins_id: int):
         d["seq_label"] = f"P{p['seq']}"
         d["feedbacks"] = fbs.get(p["id"], [])
         d["reviews"] = rvs.get(p["id"], [])
-        d["atts"] = list(atts_all.get(("problem", p["id"]), []))
+        # 整改前后对比：检查现场照片=整改前；企业反馈照片=整改后（复核直观）
+        d["atts_before"] = list(atts_all.get(("problem", p["id"]), []))
+        _after = []
         for f in d["feedbacks"]:
-            d["atts"] += atts_all.get(("feedback", f["id"]), [])
+            _after += atts_all.get(("feedback", f["id"]), [])
+        d["atts_after"] = _after
+        d["atts"] = d["atts_before"] + _after
         probs.append(d)
     ins_atts = conn.execute("SELECT * FROM attachments WHERE owner_type='inspection' AND owner_id=?", (ins_id,)).fetchall()
     corrections = conn.execute("SELECT * FROM audit_logs WHERE action='更正留痕-解除归档锁定' AND entity='inspection'"

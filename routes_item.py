@@ -38,6 +38,14 @@ async def item_save(request: Request, iid: int = Form(0), code: str = Form(...),
         old = conn.execute("SELECT * FROM check_items WHERE id=?", (iid,)).fetchone()
         if not old:
             conn.close(); return HTMLResponse("检查项不存在", status_code=404)
+        # 修改前版本存档（条款库版本历史）：旧文本入库可追溯；历史检查记录另有登记时快照，互不影响
+        conn.execute("INSERT INTO check_item_history(item_id,code,category,name,content,legal_basis,method,criteria,"
+                     "is_key,is_veto,score,scope,note,active,changed_by,changed_at,change_note)"
+                     " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (iid, old["code"], old["category"], old["name"], old["content"], old["legal_basis"],
+                      old["method"], old["criteria"], old["is_key"], old["is_veto"], old["score"],
+                      old["scope"], old["note"], old["active"], user["username"],
+                      datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "修改前版本存档"))
         conn.execute("UPDATE check_items SET code=?,category=?,name=?,content=?,legal_basis=?,method=?,criteria=?,"
                      "is_key=?,is_veto=?,score=?,scope=?,note=? WHERE id=?", vals + (iid,))
         fields = ["code", "category", "name", "content", "legal_basis", "method", "criteria", "is_key",
@@ -54,6 +62,19 @@ async def item_save(request: Request, iid: int = Form(0), code: str = Form(...),
     return RedirectResponse("/items?msg=保存成功", status_code=302)
 
 
+@router.get("/items/{iid}/history", response_class=HTMLResponse)
+def item_history(request: Request, iid: int):
+    user, err = require(request, GOV_ROLES + ("sysadmin",))
+    if err: return err
+    conn = get_db()
+    item = conn.execute("SELECT * FROM check_items WHERE id=?", (iid,)).fetchone()
+    if not item:
+        conn.close(); return HTMLResponse("检查项不存在", status_code=404)
+    rows = conn.execute("SELECT * FROM check_item_history WHERE item_id=? ORDER BY id DESC", (iid,)).fetchall()
+    conn.close()
+    return render(request, "item_history.html", {"item": item, "rows": rows}, user)
+
+
 @router.post("/items/{iid}/toggle")
 def item_toggle(request: Request, iid: int, csrf: str = Form("")):
     user, err = require(request, ("gov_admin",))
@@ -61,6 +82,15 @@ def item_toggle(request: Request, iid: int, csrf: str = Form("")):
     if bad_csrf(user, csrf):
         return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
     conn = get_db()
+    old = conn.execute("SELECT * FROM check_items WHERE id=?", (iid,)).fetchone()
+    if old:
+        conn.execute("INSERT INTO check_item_history(item_id,code,category,name,content,legal_basis,method,criteria,"
+                     "is_key,is_veto,score,scope,note,active,changed_by,changed_at,change_note)"
+                     " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (iid, old["code"], old["category"], old["name"], old["content"], old["legal_basis"],
+                      old["method"], old["criteria"], old["is_key"], old["is_veto"], old["score"],
+                      old["scope"], old["note"], old["active"], user["username"],
+                      datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "启停前版本存档"))
     conn.execute("UPDATE check_items SET active=1-active WHERE id=?", (iid,))
     audit(conn, user["username"], "启停检查项", "check_item", iid)
     conn.commit(); conn.close()

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>检查项修改历史</h2>
+<p class="muted">条款库版本留痕：每次修改/启停前的版本自动存档（含操作人与时间）。历史检查记录逐项引用<b>登记当时</b>的文本快照，不受后续条款修订影响。</p>
+
+<div class="card">
+  <h3>当前版本（生效中）</h3>
+  <p><b>{{ item.code }}　{{ item.name }}</b>　<span class="badge">{{ item.category }}</span>
+     {% if item.is_key %}<span class="badge b-issued">重点</span>{% endif %}
+     {% if item.is_veto %}<span class="badge b-returned">否决项</span>{% endif %}
+     {% if not item.active %}<span class="badge b-draft">已停用</span>{% endif %}</p>
+  <p>检查内容：{{ item.content }}</p>
+  <p>检查依据：{{ item.legal_basis }}</p>
+  <p>判定标准：{{ item.criteria }}　方法：{{ item.method }}　分值：{{ item.score }}　适用范围：{{ item.scope or '—' }}</p>
+</div>
+
+{% for h in rows %}
+<div class="card">
+  <h3>存档版本　<span class="muted" style="font-weight:normal">{{ h.changed_at }}　{{ h.changed_by }}{% if h.change_note %}　·　{{ h.change_note }}{% endif %}</span></h3>
+  <p><b>{{ h.code }}　{{ h.name }}</b>　<span class="badge">{{ h.category }}</span>
+     {% if h.is_key %}<span class="badge b-issued">重点</span>{% endif %}
+     {% if h.is_veto %}<span class="badge b-returned">否决项</span>{% endif %}
+     {% if not h.active %}<span class="badge b-draft">当时已停用</span>{% endif %}</p>
+  <p>检查内容：{{ h.content }}</p>
+  <p>检查依据：{{ h.legal_basis }}</p>
+  <p>判定标准：{{ h.criteria }}　方法：{{ h.method }}　分值：{{ h.score }}　适用范围：{{ h.scope or '—' }}</p>
+</div>
+{% else %}
+<div class="card"><p class="muted">暂无修改记录（自入库以来未改动）。</p></div>
+{% endfor %}
+
+<p><a class="btn btn-gray" href="/items">← 返回检查项目库</a></p>
+{% endblock %}

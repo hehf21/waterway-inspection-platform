@@ -122,6 +122,16 @@ CREATE TABLE IF NOT EXISTS check_items (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS check_item_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER,
+    code TEXT, category TEXT, name TEXT, content TEXT, legal_basis TEXT,
+    method TEXT, criteria TEXT,
+    is_key INTEGER DEFAULT 0, is_veto INTEGER DEFAULT 0, score INTEGER DEFAULT 3,
+    scope TEXT DEFAULT '', note TEXT DEFAULT '', active INTEGER DEFAULT 1,
+    changed_by TEXT, changed_at TEXT, change_note TEXT DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS check_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

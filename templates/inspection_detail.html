@@ -164,7 +164,21 @@
   <div class="basis">违反条款：{{ p.legal_basis }}</div>
   <div class="basis">整改要求：{{ p.requirement }}</div>
   <div class="basis">整改期限：{{ p.deadline }}　责任人：{{ p.responsible }}</div>
-  {% if p.atts %}<div class="basis">附件：{% for a in p.atts %}{% if a.filename.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp','.bmp')) %}<a href="/attachments/{{ a.id }}" target="_blank"><img src="/attachments/{{ a.id }}?inline=1" class="sign-img" alt="{{ a.filename }}" title="{{ a.filename }}"></a> {% endif %}<a href="/attachments/{{ a.id }}">📎 {{ a.filename }}</a>　{% endfor %}</div>{% endif %}
+  {% if p.atts_before or p.atts_after %}
+  <div class="basis">
+    <b>整改前后对比</b>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px">
+      <div style="flex:1;min-width:240px">
+        <div class="muted">整改前（检查现场）</div>
+        {% for a in p.atts_before %}{% if a.filename.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp','.bmp')) %}<a href="/attachments/{{ a.id }}" target="_blank"><img src="/attachments/{{ a.id }}?inline=1" class="sign-img" alt="{{ a.filename }}" title="{{ a.filename }}"></a> {% endif %}<a href="/attachments/{{ a.id }}">📎 {{ a.filename }}</a>　{% else %}<span class="muted">（无现场照片）</span>{% endfor %}
+      </div>
+      <div style="flex:1;min-width:240px">
+        <div class="muted">整改后（企业反馈）</div>
+        {% for a in p.atts_after %}{% if a.filename.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp','.bmp')) %}<a href="/attachments/{{ a.id }}" target="_blank"><img src="/attachments/{{ a.id }}?inline=1" class="sign-img" alt="{{ a.filename }}" title="{{ a.filename }}"></a> {% endif %}<a href="/attachments/{{ a.id }}">📎 {{ a.filename }}</a>　{% else %}<span class="muted">{% if p.feedbacks %}（反馈未附照片）{% else %}（待企业反馈）{% endif %}</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   {% for f in p.feedbacks %}
   <div class="fb-block">
