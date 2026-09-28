@@ -873,6 +873,11 @@ check("考核报表模板套打（占位符替换）",
       _r.status_code == 302 and _x.content[:2] == b"PK"
       and any("考核表" in v for v in _cells) and not any("{{" in v for v in _cells))
 
+# ========== 33. 浏览器兼容提示 / 备份状态进提醒 ==========
+check("低版本浏览器兼容提示条（全站兜底）", "browser-warn" in c.get("/").text)
+import routes_notify as _rn
+check("每日提醒文案含最近备份状态", "最近备份" in _rn._reminder_text())
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

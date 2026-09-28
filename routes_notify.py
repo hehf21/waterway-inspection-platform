@@ -79,6 +79,14 @@ def _reminder_text() -> str:
         lines.append(f"· …另有 {len(r['overdue']) - 5} 项逾期")
     for p in r["soon"][:5]:
         lines.append(f"· 临期（{p['deadline']}）：{p['ent_name']} {p['ins_code']}-P{p['seq']}")
+    bpath = os.path.join(BASE, "data", "backups", "last_backup.json")
+    try:
+        with open(bpath, encoding="utf-8") as fp:
+            b = json.load(fp)
+        stat = "成功" if b.get("ok") else "失败"
+        lines.append(f"最近备份：{b.get('time', '?')} {stat}（{b.get('file') or '无库备份'}）")
+    except Exception:
+        lines.append("最近备份：暂无备份记录——请配置每日备份（deploy\\backup.ps1）")
     lines.append("详见平台 → 消息提醒")
     return "\n".join(lines)
 

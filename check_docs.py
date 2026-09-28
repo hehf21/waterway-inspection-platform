@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""文档口径门禁：文档宣称的回归项数必须与 smoke_test 实际执行的断言数一致。
+"""文档口径门禁：smoke_test.py 的断言数（运行时）必须与各文档宣称的回归项数一致。
+
+用法：
+    python check_docs.py          # 检查（不一致退出 1）
+    python check_docs.py --fix    # 把文档里的旧数字自动改成实测数字（改完请再跑一次复核）
 
 数字来源优先级：
 1) smoke_last_run.txt（smoke_test.py 每次运行时写入的运行时断言数，含循环内多次执行）；
 2) 文件不存在时现场跑一遍 smoke_test.py 并解析统计行。
-用运行时数字而非 AST 调用点数：存在 `for kind in (...): check(...)` 这类循环断言
-（1 个调用点 → 4 次执行），AST 口径会少数。
 """
 import os
 import re
@@ -15,6 +17,7 @@ import sys
 sys.stdout.reconfigure(encoding="utf-8")
 BASE = os.path.dirname(os.path.abspath(__file__))
 COUNT_FILE = os.path.join(BASE, "smoke_last_run.txt")
+FIX = "--fix" in sys.argv
 
 if os.path.exists(COUNT_FILE):
     count = int(open(COUNT_FILE, encoding="utf-8").read().strip())
@@ -35,15 +38,28 @@ bad = []
 for fn in sorted(os.listdir(BASE)):
     if not fn.endswith(".md"):
         continue
-    text = open(os.path.join(BASE, fn), encoding="utf-8").read()
+    path = os.path.join(BASE, fn)
+    text = open(path, encoding="utf-8").read()
+    out = text
+    fixed = False
     for m in pattern.finditer(text):
         num = int(next(g for g in m.groups() if g))
         line = text[:m.start()].count("\n") + 1
         if num != count:
-            bad.append(f"  {fn}:{line}  写 {num} 项，实际 {count} 项  «{m.group(0)[:40]}»")
+            if FIX:
+                out = out.replace(m.group(0), m.group(0).replace(str(num), str(count)))
+                fixed = True
+                print(f"  ~ {fn}:{line}  {num} -> {count}")
+            else:
+                bad.append(f"  {fn}:{line}  写 {num} 项，实际 {count} 项  «{m.group(0)[:40]}»")
         else:
-            print(f"  ✓ {fn}:{line}  {num} 项 对齐")
+            print(f"  OK {fn}:{line}  {num} 项 对齐")
+    if fixed:
+        open(path, "w", encoding="utf-8").write(out)
 
+if FIX:
+    print("\n自动修正完成（请再跑一次 python check_docs.py 复核）")
+    sys.exit(0)
 if bad:
     print("\n[文档口径不一致]：")
     print("\n".join(bad))

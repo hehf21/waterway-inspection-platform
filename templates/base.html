@@ -8,6 +8,14 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<div id="browser-warn" style="display:none;background:#c0392b;color:#fff;padding:10px 16px;text-align:center;font-size:14px">
+  ⚠ 您的浏览器版本过旧，部分功能可能无法正常使用。请改用 Edge / Chrome 浏览器，或切换到 360/QQ 浏览器的<b>极速模式</b>访问。
+</div>
+<script nonce="{{ request.state.nonce }}">
+if (!(window.fetch && window.Promise && Array.prototype.includes)) {
+  var _bw = document.getElementById('browser-warn'); if (_bw) _bw.style.display = 'block';
+}
+</script>
 {% if user %}
 <header class="topbar">
   <div class="brand">{{ APP_NAME }}</div>
