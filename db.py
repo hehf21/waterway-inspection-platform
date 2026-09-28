@@ -354,6 +354,9 @@ def init_db():
         ("problems", "ext_status", "TEXT DEFAULT ''"),
         ("check_items", "legal_note", "TEXT DEFAULT ''"),
         ("check_item_history", "legal_note", "TEXT DEFAULT ''"),
+        ("enterprises", "org_unit", "TEXT DEFAULT ''"),
+        ("users", "org_unit", "TEXT DEFAULT ''"),
+        ("inspections", "org_unit", "TEXT DEFAULT ''"),
     ]:
         cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
         if col not in cols:

@@ -26,16 +26,16 @@ from openpyxl import Workbook
 import pdfgen
 import zipgen
 from config import (ALLOWED_EXT, ALLOW_GOV_ENT_FEEDBACK, APP_NAME, ARCHIVE_DIR, CHECK_MODES, CHECK_TYPES,
-                    GOV_ROLES, HOST, MAX_UPLOAD_MB, ORG_NAME, PORT, PROB_STATUS_CN, PUBLIC_RANDOM_NOTICE,
-                    PUSH_TIME, REC_STATUS_CN, RESULT_NA, RESULT_NG, RESULT_OK, RESULT_UNCHECKED, ROLES,
-                    SECRET_KEY, SESSION_DAYS, WEBHOOK_URL)
+                    CONCLUSIONS, GOV_ROLES, HOST, MAX_UPLOAD_MB, ORG_NAME, PORT, PROB_STATUS_CN,
+                    PUBLIC_RANDOM_NOTICE, PUSH_TIME, REC_STATUS_CN, RESULT_NA, RESULT_NG, RESULT_OK,
+                    RESULT_UNCHECKED, ROLES, SECRET_KEY, SESSION_DAYS, UNITS, WEBHOOK_URL)
 from db import audit, get_db, hash_password, init_db
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 
 COOKIE = "slys_session"
-CONCLUSIONS = ["未发现问题", "责发整改", "移送线索"]
+# CONCLUSIONS 已移入 config（支持 SLYS_CONCLUSIONS 自定义），此处经 import 转出
 
 # 登录失败限速（审计 P1-4）：滑动窗口计数 + 锁定绑定“账号+IP”，避免攻击者锁死他人账号
 LOGIN_FAILS: dict = {}       # (username, ip) -> [失败次数, 窗口起始时间戳, 锁定到期时间戳]

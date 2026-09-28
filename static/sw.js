@@ -12,5 +12,12 @@ self.addEventListener('fetch', e => {
       caches.open(CACHE).then(cc => cc.put(e.request, copy));
       return resp;
     })));
+  } else if (url.pathname === '/onsite') {
+    // 现场登记页离线可用：网络优先，断网回缓存外壳（表单内容由 autosave.js 本地暂存兜底）
+    e.respondWith(fetch(e.request).then(resp => {
+      const copy = resp.clone();
+      caches.open(CACHE).then(cc => cc.put(e.request, copy));
+      return resp;
+    }).catch(() => caches.match(e.request)));
   }
 });

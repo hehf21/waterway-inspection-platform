@@ -7,10 +7,103 @@ from webcore import *  # noqa: F401,F403
 router = APIRouter()
 
 # ---------------- 检查记录登记 ----------------
+@router.get("/inspections/template-history")
+def ins_history_template(request: Request):
+    user, err = require(request, ("gov_admin",))
+    if err: return err
+    import exportgen
+    return Response(exportgen.history_template_xlsx(),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers=dl_header("历史检查记录导入模板.xlsx"))
+
+
+@router.post("/inspections/import")
+async def ins_history_import(request: Request, csrf: str = Form(""), file: UploadFile = File(...)):
+    """历史检查记录补录：旧台账迁移进系统（记录状态直接“已归档”；企业须在名录中）"""
+    user, err = require(request, ("gov_admin",))
+    if err: return err
+    if bad_csrf(user, csrf):
+        return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
+    from openpyxl import load_workbook
+    raw = file.file.read(10 * 1024 * 1024 + 1)
+    if len(raw) > 10 * 1024 * 1024:
+        return HTMLResponse("导入文件超过 10MB 上限，请拆分后分批导入", status_code=400)
+    try:
+        wb = load_workbook(io.BytesIO(raw), read_only=True)
+    except Exception:
+        return HTMLResponse("文件无法解析，请使用 .xlsx 模板", status_code=400)
+    rows = list(wb.active.iter_rows(values_only=True))
+    if not rows:
+        return RedirectResponse("/inspections?msg=表格为空", status_code=302)
+    if len(rows) - 1 > 500:
+        return HTMLResponse("单次最多导入 500 行（当前 %d 行）" % (len(rows) - 1), status_code=400)
+    head = [str(h or "").strip() for h in rows[0]]
+    alias = {"ent": ["企业名称"], "date": ["检查日期"], "ctype": ["检查类型"], "cmode": ["检查方式"],
+             "insp": ["检查人员"], "concl": ["检查结论"], "note": ["结论说明"],
+             "desc": ["问题描述"], "basis": ["违反条款"], "req": ["整改要求"],
+             "deadline": ["整改期限"], "done": ["整改情况"]}
+    idx = {}
+    for k, names in alias.items():
+        for i, h in enumerate(head):
+            if h in names:
+                idx[k] = i
+                break
+    if "ent" not in idx or "date" not in idx:
+        return HTMLResponse("表头缺少“企业名称/检查日期”列，请使用导入模板", status_code=400)
+
+    def cell(row, k):
+        i = idx.get(k)
+        return str(row[i]).strip() if i is not None and i < len(row) and row[i] is not None else ""
+
+    conn = get_db()
+    ent_map = {r["name"]: dict(r) for r in conn.execute("SELECT id, name, org_unit FROM enterprises")}
+    today8 = datetime.now().strftime("%Y%m%d")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    added = skipped = 0
+    reasons = []
+    for row in rows[1:]:
+        ent = ent_map.get(cell(row, "ent"))
+        if not ent or not cell(row, "date"):
+            skipped += 1
+            reasons.append(f"{cell(row, 'ent') or '空行'}：企业不在名录或缺检查日期")
+            continue
+        cur = None
+        for _ in range(30):   # 编号撞号重取
+            code = alloc_ins_code(conn, today8)
+            try:
+                cur = conn.execute(
+                    "INSERT INTO inspections(code,enterprise_id,template_id,parent_id,plan_item_id,check_type,check_mode,"
+                    "check_date,location,inspectors,conclusion,conclusion_note,status,deadline,created_by,created_at,org_unit)"
+                    " VALUES(?,?,0,0,0,?,?,?,?,?,?,?,'archived',?,?,?,?)",
+                    (code, ent["id"], cell(row, "ctype") or "日常检查", cell(row, "cmode") or "现场检查",
+                     cell(row, "date"), "", cell(row, "insp"), cell(row, "concl") or "责发整改",
+                     cell(row, "note"), cell(row, "deadline"), "历史补录", now, ent["org_unit"]))
+                break
+            except sqlite3.IntegrityError:
+                continue
+        if cur is None:
+            skipped += 1
+            continue
+        ins_id = cur.lastrowid
+        if cell(row, "desc"):
+            conn.execute("INSERT INTO problems(inspection_id,seq,item_id,description,legal_basis,requirement,"
+                         "deadline,responsible,to_msa,status,created_at) VALUES(?,?,0,?,?,?,?,?,0,?,?)",
+                         (ins_id, 1, cell(row, "desc"), cell(row, "basis"), cell(row, "req"),
+                          cell(row, "deadline"), "", "passed" if cell(row, "done") else "pending", now))
+        added += 1
+        audit(conn, user["username"], "历史记录补录", "inspection", ins_id,
+              f"{code} {cell(row, 'ent')} {cell(row, 'date')}")
+    conn.commit(); conn.close()
+    msg = f"历史记录补录完成：新增{added}条，跳过{skipped}条"
+    if reasons:
+        msg += "（" + "；".join(reasons[:3]) + ("…" if len(reasons) > 3 else "") + "）"
+    return RedirectResponse(f"/inspections?msg={msg}", status_code=302)
+
+
 @router.get("/inspections", response_class=HTMLResponse)
 def ins_list(request: Request, q: str = "", status: str = "", enterprise_id: int = 0,
              check_type: str = "", check_mode: str = "", conclusion: str = "",
-             date_from: str = "", date_to: str = "", p: int = 1):
+             date_from: str = "", date_to: str = "", unit: str = "", p: int = 1):
     user, err = require(request)
     if err: return err
     conn = get_db()
@@ -38,6 +131,8 @@ def ins_list(request: Request, q: str = "", status: str = "", enterprise_id: int
         sql += " AND i.check_date>=?"; args.append(date_from)
     if date_to:
         sql += " AND i.check_date<=?"; args.append(date_to)
+    if unit:   # 站所/科室维度筛选
+        sql += " AND i.org_unit=?"; args.append(unit)
     # 分页（每页50条）：记录多了之后列表不再一次性全量渲染
     page_size = 50
     p = max(1, p)
@@ -55,7 +150,7 @@ def ins_list(request: Request, q: str = "", status: str = "", enterprise_id: int
     return render(request, "inspections.html",
                   {"rows": rows, "q": q, "status": status, "ents": ents, "f_ent": enterprise_id,
                    "f_type": check_type, "f_mode": check_mode, "f_concl": conclusion,
-                   "d_from": date_from, "d_to": date_to,
+                   "d_from": date_from, "d_to": date_to, "unit": unit, "UNITS": UNITS,
                    "p": p, "pages": pages, "total": total, "qs": qs,
                    "CHECK_TYPES": CHECK_TYPES, "CHECK_MODES": CHECK_MODES,
                    "CONCLUSIONS": CONCLUSIONS}, user)
@@ -254,6 +349,9 @@ async def ins_save(request: Request,
         if cur is None:
             conn.close(); return HTMLResponse("生成检查编号失败，请稍后重试", status_code=500)
         ins_id = cur.lastrowid
+        # 站所归属自动继承企业（多站所分类维度）
+        conn.execute("UPDATE inspections SET org_unit=(SELECT org_unit FROM enterprises WHERE id=?) WHERE id=?",
+                     (enterprise_id, ins_id))
 
     for i, it in enumerate(items):
         conn.execute("INSERT INTO inspection_items(inspection_id,item_code,category,item_name,item_content,"

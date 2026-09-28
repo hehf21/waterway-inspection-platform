@@ -217,6 +217,55 @@ def do_vacuum():
     print("VACUUM 完成：%d → %d 字节（回收 %d）" % (before, after, before - after))
 
 
+# ---------------- 恢复演练（建议每半年一次） ----------------
+def do_restore_check():
+    """把最近一份库备份恢复到临时目录并校验：备份能不能用，只有演练过才算数"""
+    import shutil
+    import tempfile
+    files = sorted(f for f in os.listdir(BACKUP_DIR) if f.startswith("app_") and f.endswith(".db")) \
+        if os.path.isdir(BACKUP_DIR) else []
+    if not files:
+        print("没有可演练的备份（data\\backups\\app_*.db）")
+        return 1
+    src = os.path.join(BACKUP_DIR, files[-1])
+    tmp = tempfile.mkdtemp(prefix="slys_restore_")
+    dst = os.path.join(tmp, "app.db")
+    shutil.copy2(src, dst)
+    c = sqlite3.connect(dst)
+    c.row_factory = sqlite3.Row
+    integrity = c.execute("PRAGMA integrity_check").fetchone()[0]
+    rows = {t: c.execute(f"SELECT COUNT(*) c FROM {t}").fetchone()["c"]
+            for t in ("users", "enterprises", "inspections", "problems", "audit_logs", "attachments")}
+    c.close()
+    print(f"恢复演练：{files[-1]} → {dst}")
+    print(f"  完整性：{integrity}")
+    print("  关键表行数：", rows)
+    ok = integrity == "ok" and rows["users"] > 0
+    shutil.rmtree(tmp, ignore_errors=True)
+    print("演练结论：", "备份可用" if ok else "异常，请人工核查")
+    return 0 if ok else 1
+
+
+# ---------------- 密钥文件权限收紧（Windows） ----------------
+def do_harden():
+    """secret.key 收紧为仅当前用户可读（防同机其他本地账号读取会话密钥）"""
+    key = os.path.join(P, "data", "secret.key")
+    if not os.path.exists(key):
+        print("data\\secret.key 不存在（首次启动平台会生成）")
+        return 1
+    if os.name != "nt":
+        os.chmod(key, 0o600)
+        print("已设置 chmod 600：", key)
+        return 0
+    import subprocess
+    user = os.environ.get("USERNAME", "")
+    r = subprocess.run(["icacls", key, "/inheritance:r", "/grant:r", f"{user}:R"],
+                       capture_output=True, text=True)
+    print((r.stdout or r.stderr).strip())
+    print("已收紧：", key)
+    return 0 if r.returncode == 0 else 1
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     cmd = args[0] if args else "check"
@@ -231,5 +280,9 @@ if __name__ == "__main__":
         do_clean("--apply" in args)
     elif cmd == "vacuum":
         do_vacuum()
+    elif cmd == "restore-check":
+        sys.exit(do_restore_check())
+    elif cmd == "harden":
+        sys.exit(do_harden())
     else:
         print(__doc__)

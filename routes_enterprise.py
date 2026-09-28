@@ -31,7 +31,7 @@ def ent_list(request: Request, q: str = "", p: int = 1):
 async def ent_save(request: Request, eid: int = Form(0), name: str = Form(...), credit_code: str = Form(""),
                    license_no: str = Form(""), license_type: str = Form(""), legal_person: str = Form(""),
                    contact: str = Form(""), phone: str = Form(""), address: str = Form(""), scope: str = Form(""),
-                   remark: str = Form(""), csrf: str = Form("")):
+                   remark: str = Form(""), org_unit: str = Form(""), csrf: str = Form("")):
     user, err = require(request, ("gov_admin", "sysadmin"))
     if err: return err
     if bad_csrf(user, csrf):
@@ -44,21 +44,21 @@ async def ent_save(request: Request, eid: int = Form(0), name: str = Form(...), 
         conn.close()
         return RedirectResponse("/enterprises?msg=保存失败：企业名称或信用代码已存在（若确为同一企业请直接编辑原记录）",
                                 status_code=302)
-    vals = (name, credit_code, license_no, license_type, legal_person, contact, phone, address, scope, remark)
+    vals = (name, credit_code, license_no, license_type, legal_person, contact, phone, address, scope, remark, org_unit)
     if eid:
         old = conn.execute("SELECT * FROM enterprises WHERE id=?", (eid,)).fetchone()
         if not old:
             conn.close(); return HTMLResponse("企业不存在", status_code=404)
         conn.execute("UPDATE enterprises SET name=?,credit_code=?,license_no=?,license_type=?,legal_person=?,"
-                     "contact=?,phone=?,address=?,scope=?,remark=? WHERE id=?", vals + (eid,))
+                     "contact=?,phone=?,address=?,scope=?,remark=?,org_unit=? WHERE id=?", vals + (eid,))
         fields = ["name", "credit_code", "license_no", "license_type", "legal_person", "contact", "phone",
-                  "address", "scope", "remark"]
+                  "address", "scope", "remark", "org_unit"]
         audit(conn, user["username"], "修改企业", "enterprise", eid, name,
               before=json.dumps({f: old[f] for f in fields}, ensure_ascii=False),
               after=json.dumps(dict(zip(fields, vals)), ensure_ascii=False))
     else:
         cur = conn.execute("INSERT INTO enterprises(name,credit_code,license_no,license_type,legal_person,"
-                           "contact,phone,address,scope,remark,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                           "contact,phone,address,scope,remark,org_unit,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                            vals + (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
         audit(conn, user["username"], "新增企业", "enterprise", cur.lastrowid, name)
     conn.commit(); conn.close()

@@ -84,6 +84,31 @@ def ent_template_xlsx():
     return buf.getvalue()
 
 
+def history_template_xlsx():
+    """历史检查记录补录模板（企业须已在名录中；有整改情况的问题默认按已销号补录）"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "历史检查记录"
+    cols = ["企业名称", "检查日期", "检查类型", "检查方式", "检查人员", "检查结论", "结论说明",
+            "问题描述", "违反条款", "整改要求", "整改期限", "整改情况"]
+    ws.append(cols)
+    for w, col in zip([30, 12, 12, 12, 16, 14, 28, 30, 22, 28, 12, 24], "ABCDEFGHIJKL"):
+        ws.column_dimensions[col].width = w
+    ws.append(["平潭XX航运有限公司", "2025-06-18", "日常检查", "现场检查", "张三、李四", "责发整改",
+               "示例行，导入时删除", "船员配备不足2人", "《条例》第18条", "15日内配足船员", "2025-07-03",
+               "已配足并报备"])
+    ws2 = wb.create_sheet("填写说明")
+    for line in ["1. 第1行为表头，请勿修改列名；从第2行开始填写。",
+                 "2. 企业名称须与企业名录一致（不存在的行自动跳过并回告）；检查日期格式 2025-06-18。",
+                 "3. 检查结论：未发现问题/责发整改/移送线索；有问题的行填“问题描述+整改要求”。",
+                 "4. 有“整改情况”的问题按已销号补录，否则按待整改补录；补录记录状态直接为“已归档”。",
+                 "5. 支持 .xlsx 格式，单次最多 500 行。"]:
+        ws2.append([line])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def ships_template_xlsx():
     """船舶清单批量导入模板"""
     wb = Workbook()

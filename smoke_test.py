@@ -878,6 +878,36 @@ check("低版本浏览器兼容提示条（全站兜底）", "browser-warn" in c
 import routes_notify as _rn
 check("每日提醒文案含最近备份状态", "最近备份" in _rn._reminder_text())
 
+# ========== 34. 历史记录补录 / 站所维度 ==========
+conn = get_db()
+conn.execute("UPDATE enterprises SET org_unit='澳前站所' WHERE id=1")
+conn.commit(); conn.close()
+_save_extra()
+conn = get_db()
+_iid = conn.execute("SELECT id FROM inspections ORDER BY id DESC LIMIT 1").fetchone()["id"]
+_un = conn.execute("SELECT org_unit FROM inspections WHERE id=?", (_iid,)).fetchone()["org_unit"]
+conn.close()
+check("站所维度：记录自动继承企业站所", _un == "澳前站所", f"org_unit={_un!r}")
+_hwb = Workbook()
+_hws = _hwb.active
+_hws.append(["企业名称", "检查日期", "检查类型", "检查方式", "检查人员", "检查结论", "结论说明",
+             "问题描述", "违反条款", "整改要求", "整改期限", "整改情况"])
+_hws.append(["平潭测试航运有限公司", "2025-06-18", "日常检查", "现场检查", "张三", "责发整改", "历史补录测试",
+             "历史问题", "某条", "整改", "2025-07-03", "已完成"])
+_hws.append(["不存在的企业", "2025-01-01", "日常检查", "现场检查", "张三", "未发现问题", "", "", "", "", "", ""])
+_hb = io.BytesIO()
+_hwb.save(_hb)
+_hb.seek(0)
+_r = c.post("/inspections/import", data={"csrf": t},
+            files={"file": ("hist.xlsx", _hb, "application/vnd.ms-excel")}, follow_redirects=False)
+conn = get_db()
+_n_hist = conn.execute("SELECT COUNT(*) c FROM inspections WHERE created_by='历史补录'").fetchone()["c"]
+_p_hist = conn.execute("SELECT COUNT(*) c FROM problems WHERE description='历史问题' AND status='passed'").fetchone()["c"]
+conn.close()
+check("历史记录补录（新增1条并跳过未知企业；有整改情况的问题按已销号）",
+      _r.status_code == 302 and "新增1条，跳过1条" in unquote(_r.headers.get("location", ""))
+      and _n_hist == 1 and _p_hist == 1)
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

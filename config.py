@@ -83,8 +83,20 @@ RESULT_NG = "不符合"
 RESULT_NA = "不适用"
 RESULT_UNCHECKED = "未检查"   # 显式“本次未查”（不计入符合率，打印表标注）
 
-CHECK_TYPES = ["日常检查", "专项检查", "双随机抽查", "复查", "投诉举报核查"]
-CHECK_MODES = ["现场检查", "书面检查", "网络检查"]
+def _csv_env(name, default):
+    """逗号分隔环境变量 → 列表；不配则用默认（字典自定义）"""
+    v = os.environ.get(name, "")
+    return [x.strip() for x in v.split(",") if x.strip()] or default
+
+
+CHECK_TYPES = _csv_env("SLYS_CHECK_TYPES", ["日常检查", "专项检查", "双随机抽查", "复查", "投诉举报核查"])
+CHECK_MODES = _csv_env("SLYS_CHECK_MODES", ["现场检查", "书面检查", "网络检查"])
+CONCLUSIONS = _csv_env("SLYS_CONCLUSIONS", ["未发现问题", "责发整改", "移送线索"])
+# 站所/科室分类维度（SLYS_UNITS="XX站所,XX中队"）；不配置则界面不显示该维度
+UNITS = _csv_env("SLYS_UNITS", [])
+# 内建 HTTPS（配了证书即 https 直出，无需 nginx）：SLYS_SSL_CERT / SLYS_SSL_KEY 指向 PEM 文件
+SSL_CERT = os.environ.get("SLYS_SSL_CERT", "")
+SSL_KEY = os.environ.get("SLYS_SSL_KEY", "")
 
 ROLES = {
     "gov_admin": "政府管理员",

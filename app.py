@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
-from config import APP_NAME, HOST, PORT
+from config import APP_NAME, HOST, PORT, SSL_CERT, SSL_KEY
 from db import init_db, get_db
 from webcore import IP_FAILS, LIMITER_MAX_ENTRIES, LOGIN_FAILS, templates  # noqa: F401  供测试/运维引用
 
@@ -139,5 +139,11 @@ def _setup_file_log():
 if __name__ == "__main__":
     _setup_file_log()
     import uvicorn
-    print(f"[启动] {APP_NAME} http://{HOST}:{PORT}  运行日志：data\\logs\\app.log")
-    uvicorn.run(app, host=HOST, port=PORT)
+    scheme = "https" if SSL_CERT and SSL_KEY else "http"
+    print(f"[启动] {APP_NAME} {scheme}://{HOST}:{PORT}  运行日志：data\\logs\\app.log")
+    if SSL_CERT and SSL_KEY:
+        # 内建 HTTPS：配 SLYS_SSL_CERT/SLYS_SSL_KEY（PEM）即直出，无需 nginx；
+        # 自签证书用 deploy/make_cert.py 生成（内网部署）；有 CA 证书直接用。
+        uvicorn.run(app, host=HOST, port=PORT, ssl_certfile=SSL_CERT, ssl_keyfile=SSL_KEY)
+    else:
+        uvicorn.run(app, host=HOST, port=PORT)

@@ -35,6 +35,26 @@
   <button type="button" class="btn" id="batch-print-btn" title="勾选多条检查表合成一份 A4 文档一次打印">🖨 批量打印检查表</button>
   {% endif %}
 </form>
+{% if user.role == 'gov_admin' %}
+<details style="display:inline"><summary style="cursor:pointer;color:var(--primary)">📥 历史记录补录</summary>
+  <div class="card">
+    <a class="btn btn-sm btn-gray" href="/inspections/template-history">下载导入模板（.xlsx）</a>
+    <form method="post" action="/inspections/import" enctype="multipart/form-data" class="form-inline" style="margin-top:8px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="file" name="file" accept=".xlsx" required>
+      <button class="btn-sm btn-green">导入历史记录</button>
+      <span class="muted">旧台账迁移补录，记录状态为“已归档”；企业须先在名录中</span>
+    </form>
+  </div>
+</details>
+{% endif %}
+{% if UNITS %}
+<form method="get" class="form-inline" style="display:inline;margin-left:8px">
+  <select name="unit" data-submit><option value="">全部站所</option>
+    {% for u in UNITS %}<option value="{{ u }}" {{ 'selected' if unit == u }}>{{ u }}</option>{% endfor %}
+  </select>
+</form>
+{% endif %}
 <p class="muted">共 {{ total }} 条记录{% if q or status or f_ent or f_type or f_mode or f_concl or d_from or d_to %}（已按筛选条件过滤）{% endif %}；勾选多条可批量打包归档。</p>
 <form id="batchform" method="post" action="/archives/batch" style="display:none">
   <input name="ids" id="batch-ids">
