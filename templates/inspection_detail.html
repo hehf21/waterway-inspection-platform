@@ -151,7 +151,10 @@
   </table>
 </div>
 
-<h3>问题与整改（{{ probs|length }}项）</h3>
+<h3>问题与整改（{{ probs|length }}项{% if probs|length %}　·　整改进度 {{ probs|selectattr('status','equalto','passed')|list|length }}/{{ probs|length }}{% endif %}）</h3>
+{% if probs|length and (probs|selectattr('status','equalto','passed')|list|length) < probs|length %}
+<p class="muted">多个问题需逐条“✎ 整改反馈”、逐条“✔ 复核”销号；每完成一条，此处进度 +1。</p>
+{% endif %}
 {% for p in probs %}
 <div class="prob-card">
   <h4>{{ p.seq_label }}　{{ p.description }}

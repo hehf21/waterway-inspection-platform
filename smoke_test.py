@@ -747,11 +747,13 @@ for _r in _rows:
 check("审计日志哈希链完整（全部入链无断点）",
       _brk == 0 and all(_r["chain_hash"] for _r in _rows), f"{len(_rows)}条 断点{_brk}")
 
-# ========== 27. 会话 Cookie 安全属性 ==========
-_ck = c.post("/login", data={"username": "gov", "password": "gov2026!"},
-             follow_redirects=False).headers.get("set-cookie", "")
-_ck2 = c.post("/login", data={"username": "gov", "password": "gov2026!"}, follow_redirects=False,
-              headers={"X-Forwarded-Proto": "https"}).headers.get("set-cookie", "")
+# ========== 27. 会话 Cookie 安全属性（独立客户端，避免 Secure Cookie 污染主会话） ==========
+_ckc = TestClient(app)
+_ckc.post("/login", data={"username": "gov", "password": "gov2026!"}, follow_redirects=False)
+_ck = _ckc.post("/login", data={"username": "gov", "password": "gov2026!"},
+                follow_redirects=False).headers.get("set-cookie", "")
+_ck2 = _ckc.post("/login", data={"username": "gov", "password": "gov2026!"}, follow_redirects=False,
+                 headers={"X-Forwarded-Proto": "https"}).headers.get("set-cookie", "")
 check("会话Cookie安全属性（HttpOnly+SameSite；HTTPS/反代自动加Secure）",
       "HttpOnly" in _ck and "SameSite=lax" in _ck and "Secure" not in _ck and "Secure" in _ck2,
       f"http头={_ck[:80]} / https头={_ck2[:80]}")
@@ -766,6 +768,12 @@ r = c.post("/inspections/save", data={"csrf": t, "ins_id": 0, "enterprise_id": 1
 check("缺必填项→友好校验页（不再裸JSON）",
       r.status_code == 422 and "表单校验未通过" in r.text and '"detail"' not in r.text,
       f"status={r.status_code}")
+
+# ========== 29. 问题整改进度提示（使用体验修复） ==========
+_r6 = c.get(f"/inspections/{ins6}")
+check("问题整改进度提示（多问题逐条销号可见进度）",
+      _r6.status_code == 200 and "整改进度 0/1" in _r6.text and "逐条" in _r6.text,
+      f"ins6={ins6} 状态={_r6.status_code} 长度={len(_r6.text)}")
 
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
