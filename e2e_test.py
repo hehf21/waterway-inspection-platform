@@ -108,16 +108,21 @@ def main():
             page.click("#entform button")
             ok("新建企业（data-show 委托生效）", "E2E测试航运有限公司" in page.content())
 
-            # 3. 登记检查：模板 + 逐项下拉点选 + 提交
+            # 3. 登记检查：模板 + 一键填充 + 快捷期限 + 逐项点选 + 提交
             page.goto(URL + "/inspections/new")
             page.select_option("select[name=enterprise_id]", index=1)   # 首个企业（空库仅一家）
             page.select_option("#tpl_sel", index=1)
             selects = page.locator("select[data-res]")
             n = selects.count()
-            for i in range(n):
-                selects.nth(i).select_option(label="符合")   # data-res 变更委托
+            page.click("#btn-all-ok")                 # 未选项一键填充“符合”
+            filled = selects.evaluate_all("els => els.every(e => e.value === '符合')")
+            ok("一键填充（未选的全部填符合）", n > 0 and filled, f"n={n}")
+            page.click("button[data-deadline='15']")  # 快捷期限 15 天
+            ok("快捷整改期限（15天自动填）", bool(page.input_value("input[name=deadline]")),
+               page.input_value("input[name=deadline]"))
+            ok("连录按钮存在（保存并登记下一家）", page.locator("#btn-submit-next").count() == 1)
             cnt = page.locator("#item-count").inner_text()
-            ok("逐项结果点选生效（委托 change）", n > 0 and "共 %d 项" % n in cnt, f"n={n} cnt={cnt}")
+            ok("逐项结果点选生效（委托 change）", "共 %d 项" % n in cnt, f"n={n} cnt={cnt}")
             # 造一个“不符合”项 → 自动带出问题卡（走真实 onResult 委托路径）
             selects.first.select_option(label="不符合")
             req = page.locator("textarea[data-pf$=':requirement']").first
@@ -156,7 +161,13 @@ def main():
                 page.wait_for_load_state()
             ok("企业工作台待办区", "待我整改" in page.content() and "工作台" in page.content())
             page.goto(ins_url)
-            page.click("text=✎ 整改反馈")          # 子串匹配：按钮文案为“✎ 整改反馈（填写）”
+            page.evaluate("document.querySelectorAll('details').forEach(d => { d.open = true; })")   # 展开折叠区
+            # 延期申请（企业提出，政府稍后审批）
+            page.fill("input[name=ext_deadline]", "2030-06-30")
+            page.fill("input[name=ext_reason]", "E2E台风影响停工")
+            page.locator("form[action*='/ext'] button").click()
+            ok("企业提交延期申请", wait_text(page, "延期申请中"))
+            page.evaluate("document.querySelectorAll('details').forEach(d => { d.open = true; })")
             page.fill("textarea[name=measure]", "E2E整改措施：已整改到位")
             page.click("text=提交整改反馈")
             ok("企业整改反馈提交", wait_text(page, "待复核"))
@@ -169,6 +180,8 @@ def main():
             page.click("button[type=submit]")
             page.wait_for_load_state()
             page.goto(ins_url)
+            page.click("button[value='approve']")   # 批准延期（新期限生效并留痕）
+            ok("政府批准延期", wait_text(page, "延期已批准"))
             page.select_option("select[name=result]", "pass")
             page.click("text=提交复核")
             ok("复核通过自动闭环", wait_text(page, "已闭环"))

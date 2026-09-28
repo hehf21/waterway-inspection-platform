@@ -81,7 +81,7 @@ pdfgen/zipgen/exportgen   文书 PDF、归档 ZIP、Excel/Word 导出
 db_maintenance.py   数据库体检/备份轮转/演示数据清理/VACUUM
 deploy/             nginx HTTPS 样例、定时备份脚本
 smoke_test.py       187 项全流程回归（隔离数据目录，跑完自动清理）
-e2e_test.py         20 项浏览器级 E2E（Playwright：真实点击/签字画板/手机视口/CSP）
+e2e_test.py         25 项浏览器级 E2E（Playwright：真实点击/签字画板/手机视口/CSP）
 ```
 
 ## 测试
