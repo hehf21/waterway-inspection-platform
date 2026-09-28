@@ -156,14 +156,22 @@
 <p class="muted">多个问题需逐条“✎ 整改反馈”、逐条“✔ 复核”销号；每完成一条，此处进度 +1。</p>
 {% endif %}
 {% for p in probs %}
-<div class="prob-card">
+<div class="prob-card" id="prob-{{ p.id }}">
   <h4>{{ p.seq_label }}　{{ p.description }}
     {% if p.to_msa %}<span class="badge b-returned">移送海事</span>{% endif %}
     <span class="badge b-{{ p.status }}">{{ PROB_STATUS_CN[p.status] }}</span>
+    {% if p.deadline and p.status in ('pending','returned') and p.deadline < today %}<span class="badge b-returned">已逾期</span>{% endif %}
   </h4>
+  {% if p.deadline and p.status in ('pending','returned') and p.deadline < today %}
+  <div class="basis" style="background:#fdecea;color:#c0392b"><b>⚠ 已逾期，请尽快整改并反馈；确有困难可在下方申请延期。</b></div>
+  {% endif %}
   <div class="basis">违反条款：{{ p.legal_basis }}</div>
   <div class="basis">整改要求：{{ p.requirement }}</div>
-  <div class="basis">整改期限：{{ p.deadline }}　责任人：{{ p.responsible }}</div>
+  <div class="basis">整改期限：{{ p.deadline }}　责任人：{{ p.responsible }}
+    {% if p.ext_status == 'approved' %}<span class="badge b-issued">延期已批准 → {{ p.ext_deadline }}</span>{% endif %}
+    {% if p.ext_status == 'pending' %}<span class="badge b-review">延期申请中（{{ p.ext_deadline }}）</span>{% endif %}
+    {% if p.ext_status == 'rejected' %}<span class="badge b-returned">延期申请被驳回</span>{% endif %}
+  </div>
   {% if p.atts_before or p.atts_after %}
   <div class="basis">
     <b>整改前后对比</b>
@@ -201,7 +209,8 @@
   {% if (user.role=='enterprise' or not is_gov) and p.status in ('pending','returned') and ins.status!='archived' %}
   <details {% if p.status=='returned' %}open{% endif %}>
     <summary style="cursor:pointer;color:var(--primary)">✎ 整改反馈（{{ '重新整改' if p.status=='returned' else '填写' }}）</summary>
-    <form method="post" action="/problems/{{ p.id }}/feedback" enctype="multipart/form-data">
+    <div class="basis" style="background:#f5f7f9">📋 要求：{{ p.requirement }}　｜　期限：{{ p.deadline or '未设' }}</div>
+    <form method="post" action="/problems/{{ p.id }}/feedback" enctype="multipart/form-data" id="fb-{{ p.id }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label>问题认识 / 原因分析<textarea name="reason" rows="2"></textarea></label>
       <label>整改措施*<textarea name="measure" rows="3" required></textarea></label>
@@ -210,7 +219,25 @@
       <label>整改证明附件（整改前后照片、制度文件、证书扫描件等，可多选）<input type="file" name="files" multiple></label>
       <button class="btn-sm btn-green">提交整改反馈</button>
     </form>
+    {% if p.ext_status != 'pending' %}
+    <form method="post" action="/problems/{{ p.id }}/ext" class="form-inline" style="margin-top:8px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>确有困难可申请延期至<input type="date" name="ext_deadline" required></label>
+      <label><input name="ext_reason" required placeholder="延期理由" style="width:220px"></label>
+      <button class="btn-sm">申请延期</button>
+    </form>
+    {% endif %}
   </details>
+  {% endif %}
+
+  {% if is_gov and p.ext_status == 'pending' %}
+  <div class="basis" style="background:#fff8e6">⏰ 延期申请：延至 <b>{{ p.ext_deadline }}</b>（理由：{{ p.ext_reason }}）
+    <form style="display:inline" method="post" action="/problems/{{ p.id }}/ext/handle">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn-sm btn-green" name="action" value="approve">批准延期</button>
+      <button class="btn-sm btn-gray" name="action" value="reject">驳回</button>
+    </form>
+  </div>
   {% endif %}
 
   {% if is_gov and p.status=='submitted' %}
@@ -231,9 +258,12 @@
 <p class="muted">本次检查未发现问题。</p>
 {% endfor %}
 <script src="/static/signpad.js"></script>
+<script src="/static/autosave.js"></script>
 <script nonce="{{ request.state.nonce }}">
 initSignPad('pad-insp', 'clr-insp');
 initSignPad('pad-ent', 'clr-ent');
+// 整改反馈草稿自动保存（防误退出丢失，与登记检查同款保护）
+if (window.initAutosave) document.querySelectorAll('form[id^="fb-"]').forEach(f => initAutosave({ formId: f.id }));
 // 签字按钮委托（CSP 无 unsafe-inline）
 document.addEventListener('click', e => {
   const t = e.target.closest ? e.target.closest('[data-sign]') : null;

@@ -25,6 +25,7 @@ def item_list(request: Request, category: str = ""):
 @router.post("/items/save")
 async def item_save(request: Request, iid: int = Form(0), code: str = Form(...), category: str = Form(...),
                     name: str = Form(...), content: str = Form(...), legal_basis: str = Form(...),
+                    legal_note: str = Form(""),
                     method: str = Form(...), criteria: str = Form(...), is_key: int = Form(0),
                     is_veto: int = Form(0), score: int = Form(3), scope: str = Form(""), note: str = Form(""),
                     csrf: str = Form("")):
@@ -33,20 +34,21 @@ async def item_save(request: Request, iid: int = Form(0), code: str = Form(...),
     if bad_csrf(user, csrf):
         return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
     conn = get_db()
-    vals = (code, category, name, content, legal_basis, method, criteria, is_key, is_veto, score, scope, note)
+    vals = (code, category, name, content, legal_basis, legal_note, method, criteria, is_key, is_veto, score, scope, note)
     if iid:
         old = conn.execute("SELECT * FROM check_items WHERE id=?", (iid,)).fetchone()
         if not old:
             conn.close(); return HTMLResponse("检查项不存在", status_code=404)
         # 修改前版本存档（条款库版本历史）：旧文本入库可追溯；历史检查记录另有登记时快照，互不影响
-        conn.execute("INSERT INTO check_item_history(item_id,code,category,name,content,legal_basis,method,criteria,"
+        conn.execute("INSERT INTO check_item_history(item_id,code,category,name,content,legal_basis,legal_note,method,criteria,"
                      "is_key,is_veto,score,scope,note,active,changed_by,changed_at,change_note)"
-                     " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                      (iid, old["code"], old["category"], old["name"], old["content"], old["legal_basis"],
+                      old["legal_note"],
                       old["method"], old["criteria"], old["is_key"], old["is_veto"], old["score"],
                       old["scope"], old["note"], old["active"], user["username"],
                       datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "修改前版本存档"))
-        conn.execute("UPDATE check_items SET code=?,category=?,name=?,content=?,legal_basis=?,method=?,criteria=?,"
+        conn.execute("UPDATE check_items SET code=?,category=?,name=?,content=?,legal_basis=?,legal_note=?,method=?,criteria=?,"
                      "is_key=?,is_veto=?,score=?,scope=?,note=? WHERE id=?", vals + (iid,))
         fields = ["code", "category", "name", "content", "legal_basis", "method", "criteria", "is_key",
                   "is_veto", "score", "scope", "note"]
@@ -54,8 +56,8 @@ async def item_save(request: Request, iid: int = Form(0), code: str = Form(...),
               before=json.dumps({f: old[f] for f in fields}, ensure_ascii=False),
               after=json.dumps(dict(zip(fields, vals)), ensure_ascii=False))
     else:
-        cur = conn.execute("INSERT INTO check_items(code,category,name,content,legal_basis,method,criteria,"
-                           "is_key,is_veto,score,scope,note,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?)",
+        cur = conn.execute("INSERT INTO check_items(code,category,name,content,legal_basis,legal_note,method,criteria,"
+                           "is_key,is_veto,score,scope,note,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)",
                            vals + (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
         audit(conn, user["username"], "新增检查项", "check_item", cur.lastrowid, code)
     conn.commit(); conn.close()
@@ -84,10 +86,11 @@ def item_toggle(request: Request, iid: int, csrf: str = Form("")):
     conn = get_db()
     old = conn.execute("SELECT * FROM check_items WHERE id=?", (iid,)).fetchone()
     if old:
-        conn.execute("INSERT INTO check_item_history(item_id,code,category,name,content,legal_basis,method,criteria,"
+        conn.execute("INSERT INTO check_item_history(item_id,code,category,name,content,legal_basis,legal_note,method,criteria,"
                      "is_key,is_veto,score,scope,note,active,changed_by,changed_at,change_note)"
-                     " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                      (iid, old["code"], old["category"], old["name"], old["content"], old["legal_basis"],
+                      old["legal_note"],
                       old["method"], old["criteria"], old["is_key"], old["is_veto"], old["score"],
                       old["scope"], old["note"], old["active"], user["username"],
                       datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "启停前版本存档"))

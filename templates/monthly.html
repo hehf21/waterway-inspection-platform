@@ -10,6 +10,20 @@
   <button type="button" class="btn btn-gray" data-print>🖨 打印</button>
   <a class="btn btn-gray" href="/stats">返回统计分析</a>
 </p>
+{% if user.role == 'gov_admin' %}
+<details class="card"><summary style="cursor:pointer;color:var(--primary)">📎 自定义考核报表模板（按上级报表格式套打）</summary>
+  <form method="post" action="/stats/monthly/template" enctype="multipart/form-data" class="form-inline">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button class="btn-sm btn-green">上传模板</button>
+  </form>
+  <p class="muted">模板为 .xlsx：单元格里写占位符即可，导出时自动替换为当月数据。
+     可用占位符：<code>{{ '{{month}}' }}</code> <code>{{ '{{org}}' }}</code> <code>{{ '{{ins_cnt}}' }}</code> <code>{{ '{{ent_cnt}}' }}</code>
+     <code>{{ '{{clean_cnt}}' }}</code> <code>{{ '{{rect_cnt}}' }}</code> <code>{{ '{{move_cnt}}' }}</code>
+     <code>{{ '{{p_cnt}}' }}</code> <code>{{ '{{passed}}' }}</code> <code>{{ '{{rate}}' }}</code> <code>{{ '{{overdue}}' }}</code>。
+     未上传模板时导出默认格式。</p>
+</details>
+{% endif %}
 
 <div class="card">
   <h3>一、总体情况</h3>

@@ -805,13 +805,73 @@ _it = dict(conn.execute("SELECT * FROM check_items ORDER BY id LIMIT 1").fetchon
 conn.close()
 c.post("/items/save", data={"csrf": _t2, "iid": _it["id"], "code": _it["code"], "category": _it["category"],
                             "name": _it["name"], "content": _it["content"] + "（修订测试）",
-                            "legal_basis": _it["legal_basis"], "method": _it["method"],
+                            "legal_basis": _it["legal_basis"], "legal_note": _it.get("legal_note", ""),
+                            "method": _it["method"],
                             "criteria": _it["criteria"], "is_key": _it["is_key"], "is_veto": _it["is_veto"],
                             "score": _it["score"], "scope": _it["scope"], "note": _it["note"]},
        follow_redirects=True)
 _h = c.get(f"/items/{_it['id']}/history")
 check("检查项修改历史存档（改前版本可追溯）",
       _h.status_code == 200 and "存档版本" in _h.text and "修改前版本存档" in _h.text)
+
+# ========== 32. 使用建议“全部优化”批次 ==========
+_r = c.post("/inspections/save", data={"csrf": t, "ins_id": 0, "enterprise_id": 1, "template_id": 0,
+                                      "parent_id": 0, "plan_item_id": 0, "check_type": "日常检查",
+                                      "check_mode": "现场检查", "check_date": date.today().isoformat(),
+                                      "inspectors": "李", "conclusion": "未发现问题",
+                                      "items_json": json.dumps([dict(new_item(), result="未检查")], ensure_ascii=False),
+                                      "problems_json": "[]"}, follow_redirects=False)
+check("“未检查”结果合法保存（本次未查项显式标记）", _r.status_code == 302,
+      f"status={_r.status_code} 片段={_r.text[:120]!r}")
+_r = c.post("/inspections/save", data={"csrf": t, "ins_id": 0, "enterprise_id": 1, "template_id": 0,
+                                      "parent_id": 0, "plan_item_id": 0, "check_type": "日常检查",
+                                      "check_mode": "现场检查", "check_date": date.today().isoformat(),
+                                      "inspectors": "李", "conclusion": "未发现问题",
+                                      "items_json": "[]", "problems_json": "[]", "next": "new"},
+            follow_redirects=False)
+check("“保存并登记下一家”连录跳转",
+      _r.status_code == 302 and "/inspections/new" in _r.headers.get("location", ""),
+      f"status={_r.status_code} loc={_r.headers.get('location', '')[:80]}")
+conn = get_db()
+_pid = conn.execute("SELECT id FROM problems WHERE status IN ('pending','returned') ORDER BY id LIMIT 1"
+                    ).fetchone()["id"]
+conn.close()
+_c1 = c.post(f"/problems/{_pid}/ext", data={"csrf": t, "ext_deadline": "2030-01-01",
+                                            "ext_reason": "台风影响停工"}, follow_redirects=False)
+_c2 = c.post(f"/problems/{_pid}/ext/handle", data={"csrf": t, "action": "approve"}, follow_redirects=False)
+conn = get_db()
+_p = conn.execute("SELECT deadline, ext_status FROM problems WHERE id=?", (_pid,)).fetchone()
+conn.close()
+check("延期申请→审批→新期限生效（留痕）",
+      _c1.status_code == 302 and _c2.status_code == 302
+      and _p["deadline"] == "2030-01-01" and _p["ext_status"] == "approved")
+_r = c.get("/")
+check("工作台本月态势卡", "本月态势" in _r.text and "整改完成率" in _r.text)
+_tec = TestClient(app)
+_tec.post("/login", data={"username": "ent", "password": "ent2027!"}, follow_redirects=False)
+check("待办/提醒直达问题锚点（#prob-）", "#prob-" in _tec.get("/").text)
+conn = get_db()
+_nl = conn.execute("SELECT legal_note FROM check_items WHERE code='A01'").fetchone()
+_pg = c.get("/items").text
+conn.close()
+check("法条摘要种子与悬停提示", "经营许可证有效期5年" in _pg,
+      f"A01摘要={(_nl['legal_note'] if _nl else '(无A01)')!r} 页面含data-legalnote={'data-legalnote' in _pg}")
+_w2 = Workbook()
+_s2 = _w2.active
+_s2.append(["{{org}} {{month}} 考核表"])
+_s2.append(["检查次数", "{{ins_cnt}}", "完成率", "{{rate}}"])
+_b2 = io.BytesIO()
+_w2.save(_b2)
+_b2.seek(0)
+_r = c.post("/stats/monthly/template", data={"csrf": t},
+            files={"file": ("tpl.xlsx", _b2, "application/vnd.ms-excel")}, follow_redirects=False)
+_x = c.get("/stats/monthly/export")
+from openpyxl import load_workbook as _lw
+_cells = [c2.value for ws in _lw(io.BytesIO(_x.content)).worksheets for row in ws.iter_rows() for c2 in row
+          if isinstance(c2.value, str)]
+check("考核报表模板套打（占位符替换）",
+      _r.status_code == 302 and _x.content[:2] == b"PK"
+      and any("考核表" in v for v in _cells) and not any("{{" in v for v in _cells))
 
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")

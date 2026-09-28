@@ -103,10 +103,12 @@ def ins_new(request: Request, edit: int = 0):
     plan_items = conn.execute("SELECT pi.id, pi.check_type, pi.period, pi.count_plan, p.title"
                               " FROM plan_items pi JOIN plans p ON p.id=pi.plan_id"
                               " WHERE p.status='issued' ORDER BY p.id DESC, pi.id").fetchall()
+    gov_names = [r["real_name"] for r in conn.execute(
+        "SELECT real_name FROM users WHERE role LIKE 'gov%' AND active=1 ORDER BY real_name")]
     conn.close()
     return render(request, "inspection_new.html",
                   {"ents": ents, "tpls": tpls, "tpl_items": tpl_items, "all_items": all_items,
-                   "recents": recents, "plan_items": plan_items,
+                   "recents": recents, "plan_items": plan_items, "gov_names": gov_names,
                    "CHECK_TYPES": CHECK_TYPES, "CHECK_MODES": CHECK_MODES,
                    "ins": ins, "ins_items": ins_items, "ins_probs": ins_probs}, user)
 
@@ -171,7 +173,7 @@ async def ins_save(request: Request,
                    check_mode: str = Form("现场检查"), check_date: str = Form(...), location: str = Form(""),
                    inspectors: str = Form(""), deadline: str = Form(""), conclusion: str = Form(""),
                    conclusion_note: str = Form(""),
-                   items_json: str = Form("[]"), problems_json: str = Form("[]"),
+                   items_json: str = Form("[]"), problems_json: str = Form("[]"), next: str = Form(""),
                    files: list[UploadFile] = File(default=[])):
     user, err = require(request, GOV_ROLES)
     if err: return err
@@ -190,8 +192,8 @@ async def ins_save(request: Request,
     if conclusion not in CONCLUSIONS:
         return HTMLResponse("检查结论不合法", status_code=400)
     for it in items:
-        if it.get("result") not in (RESULT_OK, RESULT_NG, RESULT_NA):
-            return HTMLResponse("逐项检查结果只能为 符合/不符合/不适用", status_code=400)
+        if it.get("result") not in (RESULT_OK, RESULT_NG, RESULT_NA, RESULT_UNCHECKED):
+            return HTMLResponse("逐项检查结果只能为 符合/不符合/不适用/未检查", status_code=400)
     for p in problems:
         if not str(p.get("description", "")).strip() or not str(p.get("requirement", "")).strip():
             return HTMLResponse("问题的描述与整改要求均不能为空", status_code=400)
@@ -288,6 +290,8 @@ async def ins_save(request: Request,
           + (f" 未通过：{warn}" if warn else ""))
     conn.commit(); conn.close()
     msg = "登记成功，可在详情页下发整改通知" + (f"；以下附件未保存：{warn}" if warn else "")
+    if next == "new":   # 连录：保存后直接进入下一家登记
+        return RedirectResponse(f"/inspections/new?msg=已保存 {code}，可继续登记下一家", status_code=302)
     return RedirectResponse(f"/inspections/{ins_id}?msg={msg}", status_code=302)
 
 
@@ -403,7 +407,8 @@ def ins_detail(request: Request, ins_id: int):
     return render(request, "inspection_detail.html",
                   {"ins": ins, "items": items, "probs": probs, "ins_atts": ins_atts, "is_gov": is_gov,
                    "is_admin": user["role"] == "gov_admin", "corrections": corrections,
-                   "parent": parent, "children": children, "signs": signs}, user)
+                   "parent": parent, "children": children, "signs": signs,
+                   "today": date.today().isoformat()}, user)
 
 
 @router.get("/inspections/{ins_id}/print", response_class=HTMLResponse)
@@ -527,6 +532,60 @@ async def prob_feedback(request: Request, pid: int, reason: str = Form(""), meas
 
 
 # ---------------- 政府复核 ----------------
+@router.post("/problems/{pid}/ext")
+def prob_ext(request: Request, pid: int, ext_deadline: str = Form(...), ext_reason: str = Form(""),
+             csrf: str = Form("")):
+    """整改延期申请：企业提出、政府审批；批准后新期限生效并全程留痕"""
+    user, err = require(request)
+    if err: return err
+    if bad_csrf(user, csrf):
+        return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
+    conn = get_db()
+    prob = conn.execute("SELECT * FROM problems WHERE id=?", (pid,)).fetchone()
+    if not prob:
+        conn.close(); return HTMLResponse("问题不存在", status_code=404)
+    ins = conn.execute("SELECT * FROM inspections WHERE id=?", (prob["inspection_id"],)).fetchone()
+    if user["role"] == "enterprise" and ins["enterprise_id"] != user["enterprise_id"]:
+        conn.close(); return HTMLResponse("无权操作", status_code=403)
+    if ins["status"] == "archived":
+        conn.close(); return HTMLResponse("已归档锁定，不能申请延期", status_code=403)
+    if not ext_deadline or (prob["deadline"] and ext_deadline <= prob["deadline"]):
+        conn.close(); return HTMLResponse("新期限须晚于原整改期限", status_code=400)
+    conn.execute("UPDATE problems SET ext_deadline=?, ext_reason=?, ext_status='pending' WHERE id=?",
+                 (ext_deadline, ext_reason, pid))
+    audit(conn, user["username"], "提交整改延期申请", "problem", pid,
+          f"申请延至 {ext_deadline}：{ext_reason[:60]}")
+    conn.commit(); conn.close()
+    return RedirectResponse(f"/inspections/{prob['inspection_id']}?msg=延期申请已提交，等待监管人员审批",
+                           status_code=302)
+
+
+@router.post("/problems/{pid}/ext/handle")
+def prob_ext_handle(request: Request, pid: int, action: str = Form(...), csrf: str = Form("")):
+    user, err = require(request, GOV_ROLES)
+    if err: return err
+    if bad_csrf(user, csrf):
+        return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
+    if action not in ("approve", "reject"):
+        return HTMLResponse("操作不合法", status_code=400)
+    conn = get_db()
+    prob = conn.execute("SELECT * FROM problems WHERE id=?", (pid,)).fetchone()
+    if not prob:
+        conn.close(); return HTMLResponse("问题不存在", status_code=404)
+    if prob["ext_status"] != "pending":
+        conn.close(); return HTMLResponse("没有待审批的延期申请", status_code=400)
+    if action == "approve":
+        conn.execute("UPDATE problems SET ext_status='approved', deadline=ext_deadline WHERE id=?", (pid,))
+        msg = f"已批准延期，新期限 {prob['ext_deadline']} 生效"
+    else:
+        conn.execute("UPDATE problems SET ext_status='rejected' WHERE id=?", (pid,))
+        msg = "已驳回延期申请"
+    audit(conn, user["username"], "审批整改延期", "problem", pid,
+          f"{'批准' if action == 'approve' else '驳回'}（申请延至 {prob['ext_deadline']}）")
+    conn.commit(); conn.close()
+    return RedirectResponse(f"/inspections/{prob['inspection_id']}?msg={msg}", status_code=302)
+
+
 @router.post("/problems/{pid}/review")
 def prob_review(request: Request, pid: int, result: str = Form(...), opinion: str = Form(""),
                 recheck_date: str = Form(""), recheck_note: str = Form(""), csrf: str = Form("")):
@@ -754,10 +813,13 @@ def onsite_page(request: Request, edit: int = 0):
             "SELECT ci.* FROM template_items ti JOIN check_items ci ON ci.id=ti.item_id"
             " WHERE ti.template_id=? ORDER BY ti.sort_order", (t["id"],))]
     all_items = [dict(r) for r in conn.execute("SELECT * FROM check_items WHERE active=1 ORDER BY code")]
+    gov_names2 = [r["real_name"] for r in conn.execute(
+        "SELECT real_name FROM users WHERE role LIKE 'gov%' AND active=1 ORDER BY real_name")]
     conn.close()
     return render(request, "onsite.html",
                   {"ins": ins, "ins_items": ins_items, "ins_probs": ins_probs, "signs": signs,
                    "ents": ents, "tpls": tpls, "tpl_items": tpl_items, "all_items": all_items,
+                   "gov_names": gov_names2,
                    "CHECK_TYPES": CHECK_TYPES, "CHECK_MODES": CHECK_MODES}, user)
 
 

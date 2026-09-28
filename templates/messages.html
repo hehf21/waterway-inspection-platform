@@ -27,7 +27,7 @@
       <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
       <td class="result-ng">{{ p.deadline }}</td>
       <td>{{ PROB_STATUS_CN[p.status] }}</td>
-      <td><a class="btn btn-sm" href="/inspections/{{ p.iid }}">去处理</a></td>
+      <td><a class="btn btn-sm" href="/inspections/{{ p.iid }}#prob-{{ p.id }}">去处理</a></td>
     </tr>
     {% else %}<tr><td colspan="6" class="muted">没有逾期问题 👍</td></tr>{% endfor %}
   </table>
@@ -41,7 +41,7 @@
     <tr>
       <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
       <td>{{ p.deadline }}</td>
-      <td><a class="btn btn-sm" href="/inspections/{{ p.iid }}">去处理</a></td>
+      <td><a class="btn btn-sm" href="/inspections/{{ p.iid }}#prob-{{ p.id }}">去处理</a></td>
     </tr>
     {% else %}<tr><td colspan="5" class="muted">近7天没有到期问题</td></tr>{% endfor %}
   </table>
@@ -54,7 +54,7 @@
     {% for p in r.wait_review %}
     <tr>
       <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td><td>{{ p.ent_name }}</td>
-      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.iid }}">去复核</a></td>
+      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.iid }}#prob-{{ p.id }}">去复核</a></td>
     </tr>
     {% else %}<tr><td colspan="4" class="muted">没有待复核事项</td></tr>{% endfor %}
   </table>

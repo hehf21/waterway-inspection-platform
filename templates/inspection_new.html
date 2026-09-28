@@ -30,8 +30,12 @@
     <label>检查方式<select name="check_mode">{% for m in CHECK_MODES %}<option {% if ins and ins.check_mode==m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
     <label>检查日期*<input type="date" name="check_date" value="{{ ins.check_date if ins else '' }}" required></label>
     <label>检查地点<input name="location" value="{{ ins.location if ins else '' }}"></label>
-    <label>检查人员（多人逗号分隔）*<input name="inspectors" value="{{ ins.inspectors if ins else '' }}" required placeholder="张三、李四"></label>
-    <label>整改期限<input type="date" name="deadline" value="{{ ins.deadline if ins else '' }}"></label>
+    <label>检查人员（多人逗号分隔）*<input name="inspectors" list="gov-names" value="{{ ins.inspectors if ins else '' }}" required placeholder="张三、李四"></label>
+    <datalist id="gov-names">{% for n in gov_names %}<option value="{{ n }}">{% endfor %}</datalist>
+    <label>整改期限<input type="date" name="deadline" value="{{ ins.deadline if ins else '' }}">
+      　快捷：<button type="button" class="btn-sm btn-gray" data-deadline="7">7天</button>
+      <button type="button" class="btn-sm btn-gray" data-deadline="15">15天</button>
+      <button type="button" class="btn-sm btn-gray" data-deadline="30">30天</button></label>
     <label>检查结论*<select name="conclusion" required>
       {% for c in ['未发现问题','责发整改','移送线索'] %}<option {% if ins and ins.conclusion==c %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select></label>
@@ -41,7 +45,12 @@
 </div>
 
 <div class="card">
-  <h3>二、逐项检查结果 <span class="muted" id="item-count">（请在上方选择检查表模板，或点“自选检查项”手动勾选）</span></h3>
+  <h3>二、逐项检查结果 <span class="muted" id="item-count">（请在上方选择检查表模板，或点“自选检查项”手动勾选）</span>
+    <span style="font-weight:normal;margin-left:12px">
+      <button type="button" class="btn-sm" id="btn-all-ok">未选的全部填“符合”</button>
+      <button type="button" class="btn-sm btn-gray" id="btn-all-na">未选的全部填“不适用”</button>
+    </span>
+  </h3>
   <details>
     <summary style="cursor:pointer;color:var(--primary)">＋ 自选检查项（不使用模板时）</summary>
     <div id="picker"></div>
@@ -57,7 +66,10 @@
   <label>问题默认整改期限（单条问题未单独填写时使用）<input type="date" id="prob_deadline" value="{{ ins.deadline if ins else '' }}"></label>
 </div>
 
-<p><button type="button" id="btn-submit">{{ '保存修改（草稿）' if ins else '保存登记（草稿）' }}</button>　<a class="btn btn-gray" href="/inspections">取消</a></p>
+<p><button type="button" id="btn-submit">{{ '保存修改（草稿）' if ins else '保存登记（草稿）' }}</button>
+  {% if not ins %}　<button type="button" class="btn-green" id="btn-submit-next">保存并登记下一家</button>{% endif %}
+  <input type="hidden" name="next" id="next-field" value="">
+  　<a class="btn btn-gray" href="/inspections">取消</a></p>
 </form>
 
 <script src="/static/autosave.js"></script>
@@ -120,15 +132,24 @@ function renderItems(){
           检查结果：
           <select data-res="${i}" id="res-${i}" style="width:100px">
             <option value="" ${it.result ? '' : 'selected'}>请选择</option>
-            ${['符合','不符合','不适用'].map(o => `<option ${it.result===o?'selected':''}>${o}</option>`).join('')}
+            ${['符合','不符合','不适用','未检查'].map(o => `<option ${it.result===o?'selected':''}>${o}</option>`).join('')}
           </select>
         </span>
       </div>
       <div class="basis">检查内容：${esc(it.content)}</div>
-      <div class="basis">检查依据：${esc(it.legal_basis)}</div>
+      <div class="basis" ${it.legal_note ? `title="${esc(it.legal_note)}"` : ''} style="${it.legal_note ? 'cursor:help' : ''}">检查依据：${esc(it.legal_basis)}${it.legal_note ? ' <span class="muted">（悬停看条文摘要）</span>' : ''}</div>
       <div class="basis">判定标准：${esc(it.criteria)}</div>
-      <label>情况描述<textarea rows="2" data-finding="${i}">${esc(it.finding || '')}</textarea></label>
+      <label>情况描述 <button type="button" class="btn-sm btn-gray" data-voice="find-${i}">🎤 语音</button><textarea rows="2" id="find-${i}" data-finding="${i}">${esc(it.finding || '')}</textarea></label>
     </div>`).join('');
+}
+
+function fillEmpty(v){   // 一键填充：只填“未选择”的项，不动已判定的不符合项
+  current.forEach((it, i) => {
+    if (!it.result){
+      const sel = document.querySelector(`select[data-res="${i}"]`);
+      if (sel){ sel.value = v; onResult(i, sel); }
+    }
+  });
 }
 
 function onResult(i, sel){
@@ -200,8 +221,16 @@ function submitForm(){
 /* ---- 事件委托（CSP 无 unsafe-inline，不使用内联处理器） ---- */
 document.getElementById('tpl_sel').addEventListener('change', loadTpl);
 document.getElementById('btn-picker').addEventListener('click', buildFromPicker);
+document.getElementById('btn-all-ok').addEventListener('click', () => fillEmpty('符合'));
+document.getElementById('btn-all-na').addEventListener('click', () => fillEmpty('不适用'));
 document.getElementById('btn-addprob').addEventListener('click', addProb);
+document.querySelectorAll('[data-deadline]').forEach(b => b.addEventListener('click', () => {
+  const d = new Date(Date.now() + parseInt(b.dataset.deadline, 10) * 86400000).toISOString().slice(0, 10);
+  document.querySelectorAll('input[name=deadline], input[data-pf$=":deadline"]').forEach(x => { if (!x.value) x.value = d; });
+}));
 document.getElementById('btn-submit').addEventListener('click', submitForm);
+const _bn = document.getElementById('btn-submit-next');
+if (_bn) _bn.addEventListener('click', () => { document.getElementById('next-field').value = 'new'; submitForm(); });
 document.getElementById('ins-form').addEventListener('submit', () => { window.AS && window.AS.clear(); });
 document.getElementById('items-box').addEventListener('change', e => {
   const t = e.target;

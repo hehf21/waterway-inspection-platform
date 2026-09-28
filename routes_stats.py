@@ -113,6 +113,47 @@ def stats_monthly(request: Request, month: str = ""):
     return render(request, "monthly.html", ctx, user)
 
 
+REPORT_TPL = os.path.join(BASE, "data", "report_template.xlsx")
+
+
+def _fill_report_tpl(path, vals):
+    """自定义考核报表模板套打：把单元格里的 {{key}} 替换为当月数据（文本替换，表格行不扩展）"""
+    from openpyxl import load_workbook
+    wb = load_workbook(path)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str) and "{{" in cell.value:
+                    s = cell.value
+                    for k, v in vals.items():
+                        s = s.replace("{{" + k + "}}", str(v))
+                    cell.value = s
+    return wb
+
+
+@router.post("/stats/monthly/template")
+def stats_monthly_template(request: Request, csrf: str = Form(""), file: UploadFile = File(...)):
+    """上传考核报表模板（.xlsx，单元格写 {{month}}/{{ins_cnt}} 等占位符），导出时自动套打"""
+    user, err = require(request, ("gov_admin",))
+    if err: return err
+    if bad_csrf(user, csrf):
+        return HTMLResponse("表单已过期，请返回刷新后重试", status_code=403)
+    raw = file.file.read(2 * 1024 * 1024)
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(raw))
+        assert wb.worksheets
+    except Exception:
+        return HTMLResponse("模板无法解析，请上传 .xlsx 格式", status_code=400)
+    os.makedirs(os.path.dirname(REPORT_TPL), exist_ok=True)
+    with open(REPORT_TPL, "wb") as fp:
+        fp.write(raw)
+    conn = get_db()
+    audit(conn, user["username"], "上传考核报表模板", "stats", "", file.filename or "")
+    conn.commit(); conn.close()
+    return RedirectResponse("/stats/monthly?msg=考核报表模板已保存，导出将按模板套打", status_code=302)
+
+
 @router.get("/stats/monthly/export")
 def stats_monthly_export(request: Request, month: str = ""):
     user, err = require(request, GOV_ROLES + ("sysadmin",))
@@ -147,6 +188,10 @@ def stats_monthly_export(request: Request, month: str = ""):
     rate = f"{(prob['passed'] or 0) / prob['p_cnt'] * 100:.1f}%" if prob["p_cnt"] else "-"
     ws.append(["整改完成率", rate])
     ws.append(["其中逾期未整改", prob["overdue"] or 0])
+    vals = {"month": month, "org": ORG_NAME, "ins_cnt": head["ins_cnt"] or 0, "ent_cnt": head["ent_cnt"] or 0,
+            "clean_cnt": head["clean_cnt"] or 0, "rect_cnt": head["rect_cnt"] or 0,
+            "move_cnt": head["move_cnt"] or 0, "p_cnt": prob["p_cnt"] or 0,
+            "passed": prob["passed"] or 0, "rate": rate, "overdue": prob["overdue"] or 0}
     ws2 = wb.create_sheet("按检查类型")
     ws2.append(["检查类型", "次数"])
     for r2 in conn.execute("SELECT check_type, COUNT(*) c FROM inspections WHERE check_date>=? AND check_date<?"
@@ -160,6 +205,8 @@ def stats_monthly_export(request: Request, month: str = ""):
         ws3.append([r2["category"], r2["c"]])
     audit(conn, user["username"], "导出月度考核汇总表", "stats", "", month)
     conn.commit(); conn.close()
+    if os.path.exists(REPORT_TPL):   # 自定义模板套打（未上传模板则用默认格式）
+        wb = _fill_report_tpl(REPORT_TPL, vals)
     buf = io.BytesIO()
     wb.save(buf)
     return Response(buf.getvalue(),

@@ -22,6 +22,21 @@
   {% endif %}
 </div>
 
+{% if month %}
+<div class="card">
+  <h3>本月态势　<a class="btn btn-sm btn-gray" href="/stats/monthly" style="float:right">月度汇总表 →</a></h3>
+  <div class="stat-grid">
+    <div class="stat"><div class="num">{{ month.ins }}</div><div>本月检查</div></div>
+    <div class="stat"><div class="num">{{ month.total }}</div><div>本月发现问题</div></div>
+    <div class="stat"><div class="num">{{ month.passed }}</div><div>已销号</div></div>
+    <div class="stat {{ 'warn' if month.total and month.passed < month.total }}"><div class="num">{{ ('%.0f'|format(month.passed / month.total * 100)) ~ '%' if month.total else '—' }}</div><div>整改完成率</div></div>
+  </div>
+  {% if top_overdue %}
+  <p class="muted">逾期最多企业：{% for e in top_overdue %}<b>{{ e.name }}</b>（{{ e.c }}项）　{% endfor %}<a href="/overdue">去督办 →</a></p>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="card">
   <h3>最近检查记录</h3>
   <table>
@@ -46,7 +61,7 @@
     <tr>
       <td>P{{ p.seq }}　{{ p.description[:40] }}</td><td>{{ p.ins_code }}</td>
       <td class="{{ 'result-ng' if p.deadline else 'muted' }}">{{ p.deadline or '—' }}</td>
-      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.iid }}">去整改</a></td>
+      <td><a class="btn btn-sm btn-green" href="/inspections/{{ p.iid }}#prob-{{ p.id }}">去整改</a></td>
     </tr>
     {% endfor %}
   </table>

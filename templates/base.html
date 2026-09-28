@@ -54,7 +54,26 @@ document.addEventListener('click', e => {
   if (b) { e.preventDefault(); history.back(); }
   const pr = e.target.closest ? e.target.closest('[data-print]') : null;
   if (pr) window.print();
+  const dv = e.target.closest ? e.target.closest('[data-deadline]') : null;
+  if (dv) {
+    const d = new Date(Date.now() + parseInt(dv.dataset.deadline, 10) * 86400000).toISOString().slice(0, 10);
+    document.querySelectorAll('input[name=deadline], #prob_deadline, input[data-pf$=":deadline"]').forEach(x => { if (!x.value) x.value = d; });
+  }
+  const vd = e.target.closest ? e.target.closest('[data-voice]') : null;
+  if (vd) {
+    const ta = document.getElementById(vd.dataset.voice);
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!ta || !SR) { alert('当前浏览器不支持语音输入，请用键盘（手机可用系统输入法语音）'); return; }
+    const r = new SR(); r.lang = 'zh-CN';
+    r.onresult = ev => { ta.value += ev.results[0][0].transcript; ta.dispatchEvent(new Event('change')); };
+    const old = vd.textContent; vd.textContent = '🎙…'; r.onend = () => { vd.textContent = old; };
+    try { r.start(); } catch (err) { vd.textContent = old; }
+  }
 });
+// PWA 外壳缓存（仅安全上下文生效：HTTPS 或 localhost；纯 HTTP 内网浏览器会自动跳过）
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+}
 document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.submit !== undefined) {
     const f = e.target.closest('form'); if (f && f.reportValidity()) f.submit();

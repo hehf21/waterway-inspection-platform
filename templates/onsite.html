@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>现场检查登记{% if ins %}　{{ ins.code }}{% endif %}</h2>
-<p class="muted" id="progress">已检 0 / 0 项 · 检查过程中可随时"保存检查情况"，中断后可恢复进度</p>
+<p class="muted" id="progress">已检 0 / 0 项 · 检查过程中可随时"保存检查情况"，中断后可恢复进度
+    　<button type="button" class="btn-sm" id="btn-all-ok">未选的全部填“符合”</button>
+    <button type="button" class="btn-sm btn-gray" id="btn-all-na">未选的全部填“不适用”</button>
+    　快捷期限：<button type="button" class="btn-sm btn-gray" data-deadline="7">7天</button>
+    <button type="button" class="btn-sm btn-gray" data-deadline="15">15天</button>
+    <button type="button" class="btn-sm btn-gray" data-deadline="30">30天</button></p>
 
 <form method="post" action="/inspections/save" enctype="multipart/form-data" id="onsite-form">
   <input type="hidden" name="ins_id" value="{{ ins.id if ins else 0 }}">
@@ -162,13 +167,22 @@ function renderItems(){
       <div class="basis">检查内容：${esc(it.content)}</div>
       <div class="basis">判定标准：${esc(it.criteria)}</div>
       <div class="res-btns">
-        ${['符合','不符合','不适用'].map(o =>
+        ${['符合','不符合','不适用','未检查'].map(o =>
           `<button type="button" class="res ${it.result === o ? 'sel' : ''}" data-res="${i}" data-val="${o}">${o}</button>`).join('')}
       </div>
-      <label>情况描述（可用语音输入）<textarea rows="2" data-finding="${i}">${esc(it.finding || '')}</textarea></label>
+      <label>情况描述（可用语音输入）<button type="button" class="btn-sm btn-gray" data-voice="find-${i}">🎤 语音</button><textarea rows="2" id="find-${i}" data-finding="${i}">${esc(it.finding || '')}</textarea></label>
       <label>现场照片<input type="file" name="files" accept="image/*" capture="environment" multiple></label>
     </div>`).join('');
   updateProgress();
+}
+
+function fillEmpty(v){   // 一键填充：只填未选择的项
+  current.forEach((it, i) => {
+    if (!it.result){
+      const btn = document.querySelector(`.res-btns .res[data-res="${i}"][data-val="${v}"]`);
+      if (btn) btn.click();
+    }
+  });
 }
 
 function onResult(i, val){
@@ -250,6 +264,8 @@ document.getElementById('tpl_sel').addEventListener('change', loadTpl);
 document.getElementById('btn-picker').addEventListener('click', buildFromPicker);
 document.getElementById('btn-addprob').addEventListener('click', addProb);
 document.getElementById('btn-save').addEventListener('click', saveDraft);
+document.getElementById('btn-all-ok').addEventListener('click', () => fillEmpty('符合'));
+document.getElementById('btn-all-na').addEventListener('click', () => fillEmpty('不适用'));
 document.getElementById('onsite-form').addEventListener('submit', clearAuto);
 document.getElementById('items-box').addEventListener('click', e => {
   const t = e.target.closest('[data-res][data-val]');

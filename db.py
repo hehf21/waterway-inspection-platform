@@ -308,6 +308,32 @@ def audit(conn, username, action, entity="", entity_id="", detail="", before="",
         (username, action, entity, str(entity_id), detail, before, after, ip, ts, chain))
 
 
+# 法条摘要（悬停可见）：依据条款的简要说明，仅供工作参考，以法规原文为准
+LEGAL_NOTES = {
+    "A01": "《规定》第17条：经营许可证有效期5年；届满前30日申请换证（条例第17条同口径）。",
+    "A02": "《条例》第14条：投入运营的船舶应持有效的船舶营业运输证，并随船携带备查。",
+    "A03": "《条例》第13条：船舶须持有效的船舶登记证书和船舶检验证书。",
+    "A05": "《规定》第8条：按经营规模配备海务、机务专职管理人员，资历符合要求。",
+    "A07": "《规定》第21条：禁止出租、出借、伪造、变造许可证和船舶营业运输证（条例第37条对应罚则）。",
+    "B01": "《安全生产法》第4条、第21条：建立健全全员安全生产责任制并考核落实。",
+    "B02": "《安全生产法》第5条、第21条：主要负责人履行七项职责。",
+    "B03": "《安全生产法》第24条、第25条：设安全管理机构或配备专职安全管理人员。",
+    "B05": "《安全生产法》第23条：安全生产费用按规定提取和使用。",
+    "B06": "《安全生产法》第21条第（三）项、第28条：教育培训计划、持证上岗、档案记录。",
+    "C01": "《安全生产法》第4条、第21条第（五）项、第41条：安全风险分级管控。",
+    "C02": "《安全生产法》第41条：隐患排查治理制度并落实到日常检查。",
+    "C03": "《安全生产法》第41条：隐患排查治理台账如实记录、及时报告。",
+    "C05": "《安全生产法》第21条第（六）项、第81条：应急预案与属地政府预案衔接。",
+    "C06": "《安全生产法》第81条：定期组织应急演练并评估改进。",
+    "D02": "《条例》第18条：按核定载客定额/载重量载运，不得超载（处罚属海事：条例第38条）。",
+    "D04": "《条例》第19条、第39条：客运船舶投保承运人责任保险或取得财务担保。",
+    "D13": "《条例》第24条、《规定》第35条：按规定报送月度、年度统计信息。",
+    "D15": "《安全生产法》第36条：安全设备经常性维护、保养、检测并记录。",
+    "E05": "《条例》第42条、《规定》第45条/第49条：取得许可后持续具备经营条件。",
+    "E06": "《规定》第20条、第25条（条例第33条）：不得超范围经营、擅自改装船舶等。",
+}
+
+
 def init_db():
     """建库并注入种子数据（幂等）"""
     ensure_dirs()
@@ -323,6 +349,11 @@ def init_db():
         ("inspections", "plan_item_id", "INTEGER DEFAULT 0"),
         ("archive_logs", "file_path", "TEXT DEFAULT ''"),
         ("audit_logs", "chain_hash", "TEXT DEFAULT ''"),
+        ("problems", "ext_deadline", "TEXT DEFAULT ''"),
+        ("problems", "ext_reason", "TEXT DEFAULT ''"),
+        ("problems", "ext_status", "TEXT DEFAULT ''"),
+        ("check_items", "legal_note", "TEXT DEFAULT ''"),
+        ("check_item_history", "legal_note", "TEXT DEFAULT ''"),
     ]:
         cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
         if col not in cols:
@@ -340,6 +371,11 @@ def init_db():
                 "INSERT INTO check_items(code,category,name,content,legal_basis,method,criteria,"
                 "is_key,is_veto,score,scope,note,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?)",
                 (it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8], it[9], it[10], it[11], now))
+
+    # 法条摘要补齐（只填空不覆盖人工修订；存量库同样生效）
+    for _code, _note in LEGAL_NOTES.items():
+        conn.execute("UPDATE check_items SET legal_note=? WHERE code=? AND (legal_note IS NULL OR legal_note='')",
+                     (_note, _code))
 
     if conn.execute("SELECT COUNT(*) c FROM check_templates").fetchone()["c"] == 0:
         for name, desc, codes in TEMPLATES:

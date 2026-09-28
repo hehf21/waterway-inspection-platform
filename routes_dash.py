@@ -32,6 +32,20 @@ def dashboard(request: Request):
             "SELECT p.*, i.code ins_code, e.name ent_name FROM problems p"
             " JOIN inspections i ON i.id=p.inspection_id LEFT JOIN enterprises e ON e.id=i.enterprise_id"
             " WHERE p.status='submitted' ORDER BY p.id DESC LIMIT 8").fetchall()
+        # 本月态势 + 逾期企业排行（管理视角一眼看家底）
+        m0 = date.today().strftime("%Y-%m-01")
+        ctx["month"] = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM inspections WHERE check_date>=? AND status<>'draft') ins,"
+            " (SELECT COUNT(*) FROM problems p JOIN inspections i2 ON i2.id=p.inspection_id"
+            "  WHERE i2.check_date>=? AND p.status='passed') passed,"
+            " (SELECT COUNT(*) FROM problems p JOIN inspections i2 ON i2.id=p.inspection_id"
+            "  WHERE i2.check_date>=?) total",
+            (m0, m0, m0)).fetchone()
+        ctx["top_overdue"] = conn.execute(
+            "SELECT e.name, COUNT(*) c FROM problems p JOIN inspections i ON i.id=p.inspection_id"
+            " LEFT JOIN enterprises e ON e.id=i.enterprise_id"
+            " WHERE p.status IN ('pending','returned') AND p.deadline<>'' AND p.deadline<?"
+            " GROUP BY e.name ORDER BY c DESC LIMIT 3", (today,)).fetchall()
     else:
         eid = user["enterprise_id"]
         soon_day = (date.today() + timedelta(days=7)).isoformat()

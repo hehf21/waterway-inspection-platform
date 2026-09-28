@@ -48,7 +48,7 @@ MAX_UPLOAD_MB = 50
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".7z", ".txt"}
 
 APP_NAME = "水路运输企业检查记录管理平台"
-ORG_NAME = "平潭综合实验区交通与建设局"
+ORG_NAME = os.environ.get("SLYS_ORG", "平潭综合实验区交通与建设局")   # 文书落款单位，可用环境变量覆盖
 
 # —— 可选集成开关（不配置则相关能力自动降级，不影响主流程）——
 WEBHOOK_URL = os.environ.get("SLYS_WEBHOOK_URL", "")          # 企业微信群机器人地址：每日逾期/临期提醒推送
@@ -81,6 +81,7 @@ PROB_STATUS_CN = {
 RESULT_OK = "符合"
 RESULT_NG = "不符合"
 RESULT_NA = "不适用"
+RESULT_UNCHECKED = "未检查"   # 显式“本次未查”（不计入符合率，打印表标注）
 
 CHECK_TYPES = ["日常检查", "专项检查", "双随机抽查", "复查", "投诉举报核查"]
 CHECK_MODES = ["现场检查", "书面检查", "网络检查"]

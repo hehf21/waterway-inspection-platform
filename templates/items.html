@@ -30,6 +30,7 @@
     </div>
     <label>检查内容*<textarea name="content" id="f-content" rows="2" required></textarea></label>
     <label>检查依据（法规名称+条款号）*<textarea name="legal_basis" id="f-basis" rows="2" required></textarea></label>
+    <label>法条摘要（登记页悬停提示）<textarea name="legal_note" id="f-legalnote" rows="2" placeholder="条款要点简述，仅供参考，以法规原文为准"></textarea></label>
     <label>判定标准*<textarea name="criteria" id="f-criteria" rows="2" required></textarea></label>
     <div class="form-inline">
       <label><input type="checkbox" name="is_key" id="f-key" value="1"> 重点项</label>
@@ -57,6 +58,7 @@
          data-id="{{ r.id }}" data-code="{{ r.code }}" data-cat="{{ r.category }}"
          data-name="{{ r.name }}" data-method="{{ r.method }}" data-score="{{ r.score }}"
          data-scope="{{ r.scope }}" data-content="{{ r.content }}" data-basis="{{ r.legal_basis }}"
+         data-legalnote="{{ r.legal_note }}"
          data-criteria="{{ r.criteria }}" data-note="{{ r.note }}"
          data-key="{{ r.is_key }}" data-veto="{{ r.is_veto }}">编辑</a>
       <a class="btn btn-sm btn-gray" href="/items/{{ r.id }}/history">修改历史</a>
@@ -88,6 +90,7 @@ document.querySelectorAll('[data-edit-item]').forEach(a => a.addEventListener('c
   const d = a.dataset;
   editItem(d.id, d.code, d.cat, d.name, d.method, d.score, d.scope,
            d.content, d.basis, d.criteria, d.note, d.key === '1', d.veto === '1');
+  document.getElementById('f-legalnote').value = d.legalnote || '';
 }));
 </script>
 {% endblock %}

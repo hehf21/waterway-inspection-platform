@@ -27,8 +27,8 @@ import pdfgen
 import zipgen
 from config import (ALLOWED_EXT, ALLOW_GOV_ENT_FEEDBACK, APP_NAME, ARCHIVE_DIR, CHECK_MODES, CHECK_TYPES,
                     GOV_ROLES, HOST, MAX_UPLOAD_MB, ORG_NAME, PORT, PROB_STATUS_CN, PUBLIC_RANDOM_NOTICE,
-                    PUSH_TIME, REC_STATUS_CN, RESULT_NA, RESULT_NG, RESULT_OK, ROLES, SECRET_KEY,
-                    SESSION_DAYS, WEBHOOK_URL)
+                    PUSH_TIME, REC_STATUS_CN, RESULT_NA, RESULT_NG, RESULT_OK, RESULT_UNCHECKED, ROLES,
+                    SECRET_KEY, SESSION_DAYS, WEBHOOK_URL)
 from db import audit, get_db, hash_password, init_db
 
 BASE = os.path.dirname(os.path.abspath(__file__))
