@@ -42,11 +42,10 @@ jobs:
           if [ -n "$BAD" ]; then echo "疑似敏感文件入库："; echo "$BAD"; exit 1; fi
           echo "OK"
 
-      - name: 依赖漏洞扫描（提示性，不阻断）
-        continue-on-error: true
+      - name: 依赖漏洞扫描（按声明依赖，发现漏洞即阻断）
         run: |
           pip install pip-audit
-          pip-audit
+          pip-audit -r requirements.txt    # 已实测无已知漏洞；若出现需临时放行的漏洞，加 --ignore-vuln <ID> 并注明原因
 
   e2e:
     runs-on: ubuntu-latest

@@ -775,6 +775,26 @@ check("问题整改进度提示（多问题逐条销号可见进度）",
       _r6.status_code == 200 and "整改进度 0/1" in _r6.text and "逐条" in _r6.text,
       f"ins6={ins6} 状态={_r6.status_code} 长度={len(_r6.text)}")
 
+# ========== 30. 服务端必填与引用校验（纵深防御，不依赖前端） ==========
+def _save_extra(**over):
+    base = {"csrf": t, "ins_id": 0, "enterprise_id": 1, "template_id": 0, "parent_id": 0,
+            "plan_item_id": 0, "check_type": "日常检查", "check_mode": "现场检查",
+            "check_date": date.today().isoformat(), "inspectors": "李", "conclusion": "未发现问题",
+            "items_json": "[]", "problems_json": "[]"}
+    base.update(over)
+    return c.post("/inspections/save", data=base, follow_redirects=True)
+
+
+_e1 = _save_extra(check_date="")
+_e2 = _save_extra(inspectors="")
+_e3 = _save_extra(enterprise_id=9999)
+check("服务端拒绝空日期/空检查人员/不存在企业（绕过前端也进不了库）",
+      all(x.status_code in (400, 422) for x in (_e1, _e2, _e3))
+      and ("检查日期不能为空" in _e1.text or "check_date" in _e1.text)
+      and "检查人员不能为空" in _e2.text
+      and "被检查企业不存在" in _e3.text,
+      f"{_e1.status_code}/{_e2.status_code}/{_e3.status_code} e1片段={_e1.text[_e1.text.find('校验'):][:80]!r}")
+
 n_fail = sum(1 for _, v in ok if not v)
 print(f"\n=== {len(ok) - n_fail}/{len(ok)} 通过 ===")
 # 运行时断言数（含循环内多次执行的断言）写入给 check_docs.py 校验文档口径

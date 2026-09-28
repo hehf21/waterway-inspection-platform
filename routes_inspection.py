@@ -196,6 +196,13 @@ async def ins_save(request: Request,
         if not str(p.get("description", "")).strip() or not str(p.get("requirement", "")).strip():
             return HTMLResponse("问题的描述与整改要求均不能为空", status_code=400)
     conn = get_db()
+    # 纵深防御：必填项与引用完整性不依赖前端（绕过浏览器直发请求也进不了库）
+    if not str(check_date).strip():
+        conn.close(); return HTMLResponse("检查日期不能为空", status_code=400)
+    if not str(inspectors).strip():
+        conn.close(); return HTMLResponse("检查人员不能为空", status_code=400)
+    if not conn.execute("SELECT 1 FROM enterprises WHERE id=?", (enterprise_id,)).fetchone():
+        conn.close(); return HTMLResponse("被检查企业不存在，请返回刷新后重新选择", status_code=400)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ins = None
 
